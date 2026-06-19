@@ -1,0 +1,2264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>Nick's Dividend Tracker — Live Automated</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { 900:'#0a0e1a', 850:'#0f1423', 800:'#141a2e', 750:'#1a2138', 700:'#1f2842', 650:'#24304d', 600:'#2e3a5a', 550:'#3a4770', 500:'#4a5888', 400:'#6b7aa8' },
+            charcoal: { 900:'#121418', 800:'#1a1d24', 700:'#22262f', 600:'#2c313d', 500:'#3a4050' },
+            gold: { 50:'#fef9e7', 100:'#fdf0c4', 200:'#fbe49a', 300:'#f8d56b', 400:'#F5C842', 500:'#e6b520', 600:'#c99a10', 700:'#a07808' },
+            teal: { 50:'#e0f7f1', 100:'#b2ede0', 200:'#80e2cb', 300:'#4dd6b5', 400:'#00BFA5', 500:'#00a88e', 600:'#008f78', 700:'#006e5c' },
+            risk: { low:'#00BFA5', moderate:'#F5C842', high:'#FF8C42', extreme:'#FF4757' }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      --navy-bg: #0a0e1a;
+      --navy-card: #141a2e;
+      --navy-card-alt: #1a2138;
+      --navy-border: #2e3a5a;
+      --gold: #F5C842;
+      --teal: #00BFA5;
+      --white: #f0f0f0;
+      --red: #FF4757;
+      --green: #2ecc71;
+      --glass-bg: rgba(10, 20, 50, 0.85);
+      --glass-card: rgba(10, 20, 50, 0.82);
+      --glass-card-alt: rgba(15, 25, 55, 0.80);
+      --glass-border: rgba(255, 215, 0, 0.15);
+      --glass-table: rgba(5, 15, 40, 0.80);
+      --glass-header: rgba(5, 15, 40, 0.90);
+      --glass-modal: rgba(5, 15, 40, 0.95);
+    }
+    * { box-sizing: border-box; }
+    body { background: var(--navy-bg); color: var(--white); font-family: 'Inter', sans-serif; margin: 0; overflow-x: hidden; }
+
+    /* ========== NATURE BACKGROUND SLIDESHOW ========== */
+    #nature-bg {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      z-index: 0;
+      background: #0a1628;
+      overflow: hidden;
+    }
+    .nature-slide {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-size: cover;
+      background-position: center center;
+      opacity: 0;
+      transition: opacity 2.5s ease-in-out;
+    }
+    .nature-slide.active {
+      opacity: 1;
+    }
+    #nature-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(5, 15, 35, 0.70);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* All app content above background */
+    body > *:not(#nature-bg):not(#nature-overlay) {
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ========== GLASS MORPHISM OVERRIDES ========== */
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .tab-btn { transition: all 0.2s; background: rgba(255,255,255,0.06); }
+    .tab-btn.active { background: var(--gold); color: #0a0e1a; font-weight: 600; }
+    .tab-btn:not(.active):hover { background: rgba(245,200,66,0.18); }
+    .gold-row { background: rgba(245,200,66,0.14) !important; }
+    .green-row { background: rgba(0,191,165,0.18) !important; }
+    .card {
+      background: rgba(10, 22, 50, 0.92) !important;
+      border: 1px solid rgba(255, 215, 0, 0.12) !important;
+      border-radius: 12px;
+    }
+    .card-alt {
+      background: var(--glass-card-alt);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    table { border-collapse: collapse; table-layout: fixed; width: 1700px; }
+    th, td { box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 8px 10px; font-size: 0.78rem; }
+    th {
+      background: rgb(15, 25, 55);
+      color: #F5C842;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      border-bottom: 2px solid rgba(245, 200, 66, 0.25);
+    }
+    td { border-bottom: 1px solid rgba(46,58,90,0.3); }
+    tbody tr:nth-child(even) { background: rgba(10,18,40,0.55); }
+    tbody tr:nth-child(odd) { background: rgba(15,23,50,0.55); }
+    .edit-input { background: rgba(10,14,26,0.8); border: 1px solid var(--gold); color: white; padding: 2px 4px; border-radius: 4px; width: 72px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(245,200,66,0.3); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.5; } }
+    .animate-pulse-slow { animation: pulse 2s ease-in-out infinite; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+    .scroll-table { overflow-x: auto; width: 100%; }
+    .scroll-table::-webkit-scrollbar { height: 6px; }
+    .scroll-table::-webkit-scrollbar-track { background: rgba(10,20,50,0.5); }
+    .scroll-table::-webkit-scrollbar-thumb { background: #2e3a5a; border-radius: 3px; }
+    .risk-low { background: rgba(0,191,165,0.2); color: #00BFA5; }
+    .risk-moderate { background: rgba(245,200,66,0.2); color: #F5C842; }
+    .risk-high { background: rgba(255,140,66,0.2); color: #FF8C42; }
+    .risk-extreme { background: rgba(255,71,87,0.2); color: #FF4757; }
+    .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+    .collapsible-content.open { max-height: 500px; }
+    .summary-card {
+      background: linear-gradient(135deg, rgba(10,20,50,0.88) 0%, rgba(15,25,55,0.85) 100%);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+    }
+    .highlight-month { background: rgba(245,200,66,0.25) !important; }
+    canvas { max-width: 100%; }
+
+    /* Toast */
+    .toast-container { position: fixed; top: 70px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+    .toast { pointer-events: auto; padding: 12px 20px; border-radius: 10px; font-size: 0.82rem; font-weight: 500; color: white; backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0,0,0,0.4); transform: translateX(120%); opacity: 0; transition: all 0.35s cubic-bezier(0.4,0,0.2,1); max-width: 380px; }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast-success { background: rgba(0,191,165,0.92); border: 1px solid rgba(0,191,165,0.5); }
+    .toast-error { background: rgba(255,71,87,0.92); border: 1px solid rgba(255,71,87,0.5); }
+    .toast-warning { background: rgba(245,200,66,0.92); color: #0a0e1a; border: 1px solid rgba(245,200,66,0.5); }
+    .toast-info { background: rgba(90,130,200,0.92); border: 1px solid rgba(90,130,200,0.5); }
+
+    /* Stale badge */
+    .stale-badge { display: inline-block; font-size: 0.6rem; color: #F5C842; margin-left: 4px; cursor: help; }
+
+    /* Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(5,15,40,0.90); backdrop-filter: blur(8px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .modal-overlay.hidden { display: none; }
+    .modal-box {
+      background: var(--glass-modal);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 2px solid rgba(245,200,66,0.3);
+      border-radius: 16px;
+      max-width: 520px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 24px;
+    }
+    .modal-box::-webkit-scrollbar { width: 5px; }
+    .modal-box::-webkit-scrollbar-thumb { background: #2e3a5a; border-radius: 3px; }
+    .modal-input { background: rgba(10,14,26,0.8); border: 1px solid #2e3a5a; color: white; padding: 8px 12px; border-radius: 8px; width: 100%; font-family: 'Inter', sans-serif; font-size: 0.85rem; }
+    .modal-input:focus { outline: none; border-color: #F5C842; }
+    .modal-input::placeholder { color: #6b7aa8; }
+    .modal-select { background: rgba(10,14,26,0.8); border: 1px solid #2e3a5a; color: white; padding: 8px 12px; border-radius: 8px; width: 100%; font-size: 0.85rem; }
+    .modal-select:focus { outline: none; border-color: #F5C842; }
+    .modal-label { display: block; font-size: 0.75rem; color: #9ca3af; margin-bottom: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; }
+
+    /* Remove button */
+    .remove-btn { background: none; border: none; cursor: pointer; color: #FF4757; opacity: 0.5; transition: opacity 0.2s; padding: 2px; }
+    .remove-btn:hover { opacity: 1; }
+    .confirm-remove { display: inline-flex; align-items: center; gap: 6px; font-size: 0.7rem; }
+    .confirm-remove button { padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 600; border: none; cursor: pointer; }
+    .confirm-yes { background: #FF4757; color: white; }
+    .confirm-yes:hover { background: #e53e4e; }
+    .confirm-no { background: #2e3a5a; color: #d1d5db; }
+    .confirm-no:hover { background: #3a4770; }
+
+    /* Lookup progress */
+    .lookup-progress { margin: 8px 0; }
+    .lookup-step { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 0.75rem; color: #9ca3af; transition: all 0.3s; }
+    .lookup-step.active { color: #F5C842; }
+    .lookup-step.success { color: #00BFA5; }
+    .lookup-step.skipped { color: #6b7aa8; text-decoration: line-through; opacity: 0.6; }
+    .lookup-step.failed { color: #FF4757; }
+    .lookup-step .step-icon { width: 16px; text-align: center; flex-shrink: 0; }
+    .confidence-banner { padding: 8px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 500; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .confidence-high { background: rgba(0,191,165,0.15); border: 1px solid rgba(0,191,165,0.3); color: #00BFA5; }
+    .confidence-medium { background: rgba(245,200,66,0.15); border: 1px solid rgba(245,200,66,0.3); color: #F5C842; }
+    .confidence-low { background: rgba(255,140,66,0.15); border: 1px solid rgba(255,140,66,0.3); color: #FF8C42; }
+    .source-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.68rem; font-weight: 600; background: rgba(245,200,66,0.12); color: #F5C842; }
+
+    /* Data source pills */
+    .field-source-pill { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.58rem; font-weight: 700; margin-left: 4px; vertical-align: middle; letter-spacing: 0.02em; }
+    .pill-yahoo { background: rgba(0,191,165,0.18); color: #00BFA5; }
+    .pill-db { background: rgba(245,200,66,0.18); color: #F5C842; }
+    .pill-ai { background: rgba(168,85,247,0.18); color: #a855f7; }
+    .pill-manual { background: rgba(107,122,168,0.18); color: #6b7aa8; }
+
+    /* Yahoo link button */
+    .yahoo-link {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 2px 7px; border-radius: 5px; font-size: 0.62rem; font-weight: 600;
+      background: rgba(245,200,66,0.10); color: #F5C842; border: 1px solid rgba(245,200,66,0.20);
+      text-decoration: none; transition: all 0.2s; white-space: nowrap; vertical-align: middle; margin-left: 3px;
+    }
+    .yahoo-link:hover { background: rgba(245,200,66,0.22); border-color: rgba(245,200,66,0.4); }
+    .yahoo-link-lg {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 600;
+      background: rgba(245,200,66,0.12); color: #F5C842; border: 1px solid rgba(245,200,66,0.25);
+      text-decoration: none; transition: all 0.2s; margin-top: 8px;
+    }
+    .yahoo-link-lg:hover { background: rgba(245,200,66,0.25); border-color: rgba(245,200,66,0.5); }
+
+    /* Manage Portfolio Modal */
+    .manage-modal-overlay { position: fixed; inset: 0; background: rgba(5,12,30,0.92); backdrop-filter: blur(10px); z-index: 1100; display: flex; align-items: stretch; justify-content: center; padding: 0; }
+    .manage-modal-overlay.hidden { display: none; }
+    .manage-modal-inner { width: 100%; max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    .manage-modal-header { padding: 16px 24px; border-bottom: 1px solid rgba(245,200,66,0.2); display: flex; align-items: center; justify-content: between; flex-shrink: 0; }
+    .manage-modal-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    @media (min-width: 768px) {
+      .manage-modal-body { flex-direction: row; }
+    }
+    .manage-panel { flex: 1; overflow-y: auto; padding: 20px 24px; }
+    .manage-panel::-webkit-scrollbar { width: 5px; }
+    .manage-panel::-webkit-scrollbar-thumb { background: #2e3a5a; border-radius: 3px; }
+    .manage-panel-left { border-right: 1px solid rgba(46,58,90,0.4); }
+    @media (max-width: 767px) {
+      .manage-panel-left { border-right: none; border-bottom: 1px solid rgba(46,58,90,0.4); max-height: 40vh; }
+    }
+    .holding-card {
+      background: rgba(20,28,55,0.80);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      transition: background 0.2s;
+    }
+    .holding-card:hover { background: rgba(25,35,65,0.88); }
+    .holding-card-info { flex: 1; min-width: 0; }
+    .holding-card-actions { flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
+    .manage-remove-btn { background: rgba(255,71,87,0.15); border: 1px solid rgba(255,71,87,0.3); color: #FF4757; padding: 6px 12px; border-radius: 8px; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; }
+    .manage-remove-btn:hover { background: rgba(255,71,87,0.3); border-color: #FF4757; }
+    .manage-confirm-bar { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; flex-wrap: wrap; }
+    .manage-confirm-yes { background: #FF4757; color: white; border: none; padding: 5px 12px; border-radius: 6px; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    .manage-confirm-yes:hover { background: #e53e4e; }
+    .manage-confirm-no { background: #2e3a5a; color: #d1d5db; border: none; padding: 5px 12px; border-radius: 6px; font-size: 0.72rem; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+    .manage-confirm-no:hover { background: #3a4770; }
+    .mp-input { background: rgba(10,14,26,0.8); border: 1px solid #2e3a5a; color: white; padding: 8px 12px; border-radius: 8px; width: 100%; font-family: 'Inter', sans-serif; font-size: 0.85rem; }
+    .mp-input:focus { outline: none; border-color: #F5C842; }
+    .mp-input::placeholder { color: #6b7aa8; }
+    .mp-select { background: rgba(10,14,26,0.8); border: 1px solid #2e3a5a; color: white; padding: 8px 12px; border-radius: 8px; width: 100%; font-size: 0.85rem; }
+    .mp-select:focus { outline: none; border-color: #F5C842; }
+    .mp-label { display: block; font-size: 0.72rem; color: #9ca3af; margin-bottom: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; }
+    .mp-lookup-step { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 0.75rem; color: #9ca3af; transition: all 0.3s; }
+    .mp-lookup-step.active { color: #F5C842; }
+    .mp-lookup-step.success { color: #00BFA5; }
+    .mp-lookup-step.failed { color: #FF4757; }
+    .mp-lookup-step.skipped { color: #6b7aa8; text-decoration: line-through; opacity: 0.6; }
+
+    /* Refresh progress panel */
+    .refresh-progress-panel {
+      background: rgba(10,20,45,0.90);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(245,200,66,0.25);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-top: 10px;
+    }
+    .refresh-ticker-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 0.78rem; border-bottom: 1px solid rgba(46,58,90,0.2); }
+    .refresh-ticker-row:last-child { border-bottom: none; }
+    .refresh-ticker-symbol { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #F5C842; width: 56px; flex-shrink: 0; }
+    .refresh-ticker-status { flex: 1; color: #9ca3af; font-size: 0.72rem; }
+    .refresh-ticker-icon { width: 20px; text-align: center; flex-shrink: 0; font-size: 0.85rem; }
+    .refresh-ticker-row.pending .refresh-ticker-icon { color: #6b7aa8; }
+    .refresh-ticker-row.fetching .refresh-ticker-status { color: #F5C842; }
+    .refresh-ticker-row.success .refresh-ticker-status { color: #00BFA5; }
+    .refresh-ticker-row.success .refresh-ticker-symbol { color: #00BFA5; }
+    .refresh-ticker-row.stale .refresh-ticker-status { color: #F5C842; }
+    .refresh-ticker-row.failed .refresh-ticker-status { color: #FF4757; }
+    .refresh-ticker-row.failed .refresh-ticker-symbol { color: #FF4757; }
+    .refresh-ticker-row.cached .refresh-ticker-status { color: #6b7aa8; }
+    .refresh-summary-bar { display: flex; align-items: center; gap: 12px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(46,58,90,0.3); font-size: 0.72rem; flex-wrap: wrap; }
+    .refresh-summary-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 6px; font-weight: 600; }
+    .price-source-badge { display: inline-block; font-size: 0.55rem; padding: 1px 5px; border-radius: 4px; margin-left: 4px; font-weight: 600; vertical-align: middle; }
+    .psb-ai { background: rgba(168,85,247,0.2); color: #a855f7; }
+    .psb-twelvedata { background: rgba(0,191,165,0.2); color: #00BFA5; }
+    .psb-db { background: rgba(245,200,66,0.2); color: #F5C842; }
+    .psb-cached { background: rgba(107,122,168,0.2); color: #6b7aa8; }
+    .psb-failed { background: rgba(255,71,87,0.2); color: #FF4757; }
+    .mini-spinner { display: inline-block; width: 12px; height: 12px; border: 1.5px solid rgba(245,200,66,0.3); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; }
+
+    /* Photo credit */
+    #photo-credit {
+      position: fixed; bottom: 8px; right: 12px; z-index: 10;
+      font-size: 10px; color: rgba(255,255,255,0.3);
+      pointer-events: none;
+    }
+
+    /* Match type badges */
+    .match-type-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.62rem; font-weight: 700; margin-left: 6px; vertical-align: middle; letter-spacing: 0.03em; text-transform: uppercase; }
+    .match-exact { background: rgba(0,191,165,0.18); color: #00BFA5; }
+    .match-alias { background: rgba(0,191,165,0.15); color: #4dd6b5; }
+    .match-prefix { background: rgba(245,200,66,0.18); color: #F5C842; }
+    .match-fuzzy { background: rgba(255,140,66,0.18); color: #FF8C42; }
+    .match-name-search { background: rgba(90,130,200,0.18); color: #5a82c8; }
+    .match-pattern { background: rgba(168,85,247,0.18); color: #a855f7; }
+    .match-ai { background: rgba(168,85,247,0.18); color: #a855f7; }
+    .match-manual { background: rgba(107,122,168,0.18); color: #6b7aa8; }
+
+    /* Live price badge */
+    .live-price-badge {
+      background: rgba(0,180,0,0.15);
+      border: 1px solid #00c853;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      font-size: 14px;
+      color: #00e676;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .live-price-badge .price-disclaimer {
+      font-size: 11px;
+      color: rgba(255,255,255,0.5);
+    }
+    .emoji-icon { font-style: normal; display: inline-flex; align-items: center; justify-content: center; }
+#btn-auto-refresh-toggle.active-auto {
+  background: rgba(251, 191, 36, 0.2) !important;
+  border-color: rgba(251, 191, 36, 0.6) !important;
+  color: #fbbf24 !important;
+}
+  </style>
+</head>
+<body data-id="0">
+  <app-icon data-id="1" hidden data-icon="trending-up" data-palette="Yellow"></app-icon>
+  <app-disclaimer data-id="2" intent="financial"></app-disclaimer>
+
+  <!-- ========== NATURE BACKGROUND ========== -->
+  <div data-id="3" id="nature-bg"></div>
+  <div data-id="4" id="nature-overlay"></div>
+  <div data-id="5" id="photo-credit">📸 AI Generated</div>
+
+  <!-- TOAST CONTAINER -->
+  <div data-id="6" id="toast-container" class="toast-container"></div>
+
+  <!-- ADD TICKER MODAL (legacy — kept for compatibility) -->
+  <div data-id="7" id="add-ticker-modal" class="modal-overlay hidden">
+    <div data-id="8" class="modal-box">
+      <div data-id="9" class="flex items-center justify-between mb-5">
+        <h2 data-id="10" class="text-lg font-bold text-gold-400 flex items-center gap-2">
+          <span data-id="11" style="font-size:1em;line-height:1;">➕</span> Add Ticker to Portfolio
+        </h2>
+        <button data-id="12" id="modal-close-x" class="text-gray-400 hover:text-white transition p-1">
+          <span data-id="13" style="font-size:1em;line-height:1;">✕</span>
+        </button>
+      </div>
+      <div data-id="14" id="modal-step1">
+        <label data-id="15" class="modal-label">Ticker Symbol</label>
+        <div data-id="16" class="flex gap-2 mb-3">
+          <input data-id="17" type="text" id="lookup-ticker" class="modal-input flex-1 uppercase" placeholder="e.g. JEPY, FEPI, SPYI..." maxlength="10" />
+          <button data-id="18" id="btn-lookup" class="flex items-center gap-2 bg-gold-400 hover:bg-gold-500 text-navy-900 px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap">
+            <span data-id="19" style="font-size:1em;line-height:1;">🔍</span> Look Up
+          </button>
+        </div>
+        <div data-id="20" id="lookup-status" class="text-xs mb-3 hidden"></div>
+        <div data-id="21" id="lookup-progress-container" class="lookup-progress hidden"></div>
+      </div>
+      <div data-id="22" id="modal-step2" class="hidden">
+        <div data-id="23" id="confidence-banner-container" class="hidden"></div>
+        <div data-id="24" class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          <div data-id="25"><label data-id="26" class="modal-label">Ticker Symbol</label><input data-id="27" type="text" id="form-ticker" class="modal-input uppercase" /></div>
+          <div data-id="28"><label data-id="29" class="modal-label">ETF Name</label><input data-id="30" type="text" id="form-name" class="modal-input" placeholder="Full ETF name" /></div>
+          <div data-id="31"><label data-id="32" class="modal-label">Strategy Type</label><input data-id="33" type="text" id="form-strategy" class="modal-input" placeholder="e.g. Covered Call - Single Stock" /></div>
+          <div data-id="34"><label data-id="35" class="modal-label">Pay Group</label><select data-id="36" id="form-paygroup" class="modal-select"><option data-id="37" value="Group 1 - Thursday">Group 1 - Thursday</option><option data-id="38" value="Friday (Roundhill)">Friday (Roundhill)</option><option data-id="39" value="Group 2 - Friday">Group 2 - Friday</option><option data-id="40" value="Monthly">Monthly</option><option data-id="41" value="Other">Other</option></select></div>
+          <div data-id="42"><label data-id="43" class="modal-label">Shares Owned</label><input data-id="44" type="number" id="form-shares" class="modal-input" placeholder="0" min="0" step="1" /></div>
+          <div data-id="45"><label data-id="46" class="modal-label">Cost Basis / Share ($)</label><input data-id="47" type="number" id="form-costbasis" class="modal-input" placeholder="0.00" min="0" step="0.01" /></div>
+          <div data-id="48"><label data-id="49" class="modal-label">Current Price / Share ($)</label><input data-id="50" type="number" id="form-price" class="modal-input" placeholder="0.00" min="0" step="0.01" /></div>
+          <div data-id="51"><label data-id="52" class="modal-label">Last Dist / Share ($)</label><input data-id="53" type="number" id="form-lastdist" class="modal-input" placeholder="0.0000" min="0" step="0.0001" /></div>
+          <div data-id="54"><label data-id="55" class="modal-label">Expense Ratio (%)</label><input data-id="56" type="number" id="form-expratio" class="modal-input" placeholder="0.99" min="0" step="0.01" /></div>
+          <div data-id="57"><label data-id="58" class="modal-label">Last Pay Date</label><input data-id="59" type="date" id="form-lastpay" class="modal-input" /></div>
+          <div data-id="60"><label data-id="61" class="modal-label">Next Pay Date</label><input data-id="62" type="date" id="form-nextpay" class="modal-input" /></div>
+          <div data-id="63"><label data-id="64" class="modal-label">Last Ex-Div Date</label><input data-id="65" type="date" id="form-lastexdiv" class="modal-input" /></div>
+        </div>
+        <div data-id="66" id="form-error" class="text-xs text-red-400 mb-3 hidden"></div>
+        <div data-id="67" class="flex gap-3">
+          <button data-id="68" id="btn-add-confirm" class="flex-1 flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition"><span data-id="69" style="font-size:1em;line-height:1;">✔</span> Add to Portfolio</button>
+          <button data-id="70" id="btn-add-cancel" class="flex items-center justify-center gap-2 bg-navy-700 hover:bg-navy-650 text-gray-300 border border-navy-600 px-4 py-2.5 rounded-lg text-sm font-medium transition"><span data-id="71" style="font-size:1em;line-height:1;">✕</span> Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MANAGE PORTFOLIO MODAL -->
+  <div data-id="72" id="manage-portfolio-modal" class="manage-modal-overlay hidden">
+    <div data-id="73" class="manage-modal-inner">
+      <div data-id="74" class="manage-modal-header">
+        <div data-id="75" class="flex items-center gap-3 flex-1">
+          <span data-id="76" style="font-size:1em;line-height:1;">⚙️</span>
+          <h2 data-id="77" class="text-lg font-bold text-white">Manage Portfolio</h2>
+          <span data-id="78" class="text-xs text-gray-500 mono ml-2" id="mp-count-badge"></span>
+        </div>
+        <button data-id="79" id="mp-close-btn" class="text-gray-400 hover:text-white transition p-2 rounded-lg hover:bg-navy-700">
+          <span data-id="80" style="font-size:1em;line-height:1;">✕</span>
+        </button>
+      </div>
+      <div data-id="81" class="manage-modal-body">
+        <div data-id="82" class="manage-panel manage-panel-left">
+          <h3 data-id="83" class="text-sm font-bold text-gold-400 mb-3 flex items-center gap-2 uppercase tracking-wide">
+            <span data-id="84">📋</span> Your Current Tickers
+          </h3>
+          <div data-id="85" id="mp-holdings-list"></div>
+          <div data-id="86" id="mp-holdings-empty" class="hidden text-center py-8 text-gray-500 text-sm">No tickers in portfolio.</div>
+        </div>
+        <div data-id="87" class="manage-panel">
+          <h3 data-id="88" class="text-sm font-bold text-teal-400 mb-3 flex items-center gap-2 uppercase tracking-wide">
+            <span data-id="89">➕</span> Add New Ticker
+          </h3>
+          <div data-id="90" id="mp-add-step1">
+            <label data-id="91" class="mp-label">Enter Ticker Symbol</label>
+            <div data-id="92" class="flex gap-2 mb-3">
+              <input data-id="93" type="text" id="mp-ticker-input" class="mp-input flex-1 uppercase mono text-lg" placeholder="e.g. JEPY, FEPI, SPYI..." maxlength="10" style="font-size:1rem; letter-spacing:0.05em;" />
+              <button data-id="94" id="mp-lookup-btn" class="flex items-center gap-2 bg-gold-400 hover:bg-gold-500 text-navy-900 px-5 py-2.5 rounded-lg text-sm font-bold transition whitespace-nowrap">
+                <span data-id="95" style="font-size:1em;line-height:1;">🔍</span> Look Up
+              </button>
+            </div>
+            <div data-id="96" id="mp-lookup-status" class="text-xs mb-2 hidden"></div>
+            <div data-id="97" id="mp-lookup-progress" class="mb-3 hidden"></div>
+          </div>
+          <div data-id="98" id="mp-add-step2" class="hidden">
+            <div data-id="99" id="mp-source-banner" class="mb-3 hidden"></div>
+            <div data-id="100" id="mp-price-badge" class="hidden"></div>
+            <div data-id="101" id="mp-field-sources" class="mb-3 hidden flex flex-wrap gap-2 text-xs"></div>
+            <div data-id="102" id="mp-yahoo-link-container" class="mb-3 hidden"></div>
+            <div data-id="103" class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+              <div data-id="104"><label data-id="105" class="mp-label">Ticker Symbol</label><input data-id="106" type="text" id="mp-form-ticker" class="mp-input uppercase mono" readonly style="opacity:0.7;" /></div>
+              <div data-id="107"><label data-id="108" class="mp-label">ETF / Stock Name</label><input data-id="109" type="text" id="mp-form-name" class="mp-input" placeholder="Full name" /></div>
+              <div data-id="110"><label data-id="111" class="mp-label">Strategy Type</label><input data-id="112" type="text" id="mp-form-strategy" class="mp-input" placeholder="e.g. Covered Call" /></div>
+              <div data-id="113"><label data-id="114" class="mp-label">Pay Group</label><select data-id="115" id="mp-form-paygroup" class="mp-select"><option data-id="116" value="Group 1 - Thursday">Group 1 - Thursday</option><option data-id="117" value="Friday (Roundhill)">Friday (Roundhill)</option><option data-id="118" value="Group 2 - Friday">Group 2 - Friday</option><option data-id="119" value="Monthly">Monthly</option><option data-id="120" value="Other">Other</option></select></div>
+              <div data-id="121"><label data-id="122" class="mp-label">Shares Owned</label><input data-id="123" type="number" id="mp-form-shares" class="mp-input" placeholder="0" min="0" step="1" /></div>
+              <div data-id="124"><label data-id="125" class="mp-label">Cost Basis / Share ($)</label><input data-id="126" type="number" id="mp-form-costbasis" class="mp-input" placeholder="0.00" min="0" step="0.01" /></div>
+              <div data-id="127"><label data-id="128" class="mp-label">Current Price / Share ($)</label><input data-id="129" type="number" id="mp-form-price" class="mp-input" placeholder="0.00" min="0" step="0.01" /></div>
+              <div data-id="130"><label data-id="131" class="mp-label">Last Dist / Share ($)</label><input data-id="132" type="number" id="mp-form-lastdist" class="mp-input" placeholder="0.0000" min="0" step="0.0001" /></div>
+              <div data-id="133"><label data-id="134" class="mp-label">Expense Ratio (%)</label><input data-id="135" type="number" id="mp-form-expratio" class="mp-input" placeholder="0.99" min="0" step="0.01" /></div>
+              <div data-id="136"><label data-id="137" class="mp-label">Last Pay Date</label><input data-id="138" type="date" id="mp-form-lastpay" class="mp-input" /></div>
+              <div data-id="139"><label data-id="140" class="mp-label">Next Pay Date</label><input data-id="141" type="date" id="mp-form-nextpay" class="mp-input" /></div>
+              <div data-id="142"><label data-id="143" class="mp-label">Last Ex-Div Date</label><input data-id="144" type="date" id="mp-form-lastexdiv" class="mp-input" /></div>
+            </div>
+            <div data-id="145" id="mp-form-error" class="text-xs text-red-400 mb-3 hidden"></div>
+            <div data-id="146" class="flex gap-3">
+              <button data-id="147" id="mp-add-confirm-btn" class="flex-1 flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition"><span data-id="148" style="font-size:1em;line-height:1;">✔</span> Add to Portfolio</button>
+              <button data-id="149" id="mp-add-reset-btn" class="flex items-center justify-center gap-2 bg-navy-700 hover:bg-navy-650 text-gray-300 border border-navy-600 px-4 py-2.5 rounded-lg text-sm font-medium transition"><span data-id="150" style="font-size:1em;line-height:1;">↺</span> Reset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STICKY HEADER -->
+  <header data-id="151" class="sticky top-0 z-50 border-b border-gold-400/10 px-4 md:px-6 py-3" style="background:rgba(5,15,40,0.90);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);">
+    <div data-id="152" class="max-w-[1600px] mx-auto flex items-center justify-between gap-3 flex-wrap">
+      <div data-id="153" class="flex items-center gap-2">
+        <span data-id="154" style="font-size:1em;line-height:1;">📈</span>
+        <span data-id="155" class="font-bold text-base md:text-lg text-white">Nick's ETF Tracker</span>
+      </div>
+      <div data-id="156" class="flex gap-1 order-3 md:order-2 w-full md:w-auto justify-center">
+        <button data-id="157" class="tab-btn active px-3 py-2 rounded-lg text-xs md:text-sm" data-tab="log">Weekly ETF Log</button>
+        <button data-id="158" class="tab-btn px-3 py-2 rounded-lg text-xs md:text-sm text-gray-300" data-tab="dashboard">Dashboard</button>
+        <button data-id="159" class="tab-btn px-3 py-2 rounded-lg text-xs md:text-sm text-gray-300" data-tab="payouts">Upcoming Payouts</button>
+        <button data-id="160" id="btn-manage-portfolio-header" class="flex items-center gap-1.5 bg-gold-400/15 hover:bg-gold-400/25 text-gold-400 border border-gold-400/30 px-3 py-2 rounded-lg text-xs md:text-sm font-semibold transition ml-1">
+          <span data-id="161" style="font-size:1em;line-height:1;">⚙️</span> <span data-id="162" class="hidden sm:inline">Manage Portfolio</span><span data-id="163" class="sm:hidden">⚙️</span>
+        </button>
+      </div>
+      <div data-id="164" class="flex items-center gap-3 order-2 md:order-3 text-xs text-gray-400">
+        <span data-id="165" id="last-updated-header">Not yet refreshed</span>
+        <span data-id="166" id="auto-refresh-status" style="color: #fbbf24; font-size: 11px; min-width: 140px; display:inline-block;"></span>
+        <span data-id="167" class="hidden md:inline text-gold-400/70">📍 Butler, PA</span>
+      </div>
+    </div>
+  </header>
+
+  <main data-id="168" class="max-w-[1600px] mx-auto px-3 md:px-6 py-4 pb-8">
+
+    <!-- TAB 1: WEEKLY ETF LOG -->
+    <div data-id="169" id="tab-log" class="tab-content">
+      <div data-id="170" class="mb-4">
+        <h1 data-id="171" class="text-xl md:text-2xl font-bold text-white">Nick's Weekly Income ETF Tracker</h1>
+        <p data-id="172" class="text-xs md:text-sm text-gray-400 mt-1">All ETFs pay WEEKLY (52×/year) · <span data-id="173" class="text-gold-400 font-medium">GOLD</span> = pay date within 7 days · Distributions vary weekly</p>
+      </div>
+
+      <div data-id="174" class="card p-3 mb-4 flex items-start gap-2 border-l-4" style="border-left: 4px solid var(--gold);">
+        <span data-id="175" style="font-size:1em;line-height:1;">💡</span>
+        <p data-id="176" class="text-xs text-gray-300">Click <strong data-id="177" class="text-gold-400">"Refresh Live Prices"</strong> to fetch today's market prices via Twelve Data API. Use <strong data-id="178" class="text-gold-400">"⚙️ Manage Portfolio"</strong> to add or remove tickers. Edit <strong data-id="179" class="text-gold-400">"Last Dist/Share"</strong> after each weekly announcement to keep income estimates current.</p>
+      </div>
+
+      <div data-id="180" class="flex flex-wrap gap-2 mb-4">
+        <button data-id="181" id="btn-refresh" class="flex items-center gap-2 bg-navy-700/80 hover:bg-navy-650/80 text-gold-400 border border-gold-400/30 px-3 py-2 rounded-lg text-xs font-medium transition backdrop-blur">
+          <span data-id="182" style="font-size:1em;line-height:1;">🔄</span> Refresh Live Prices
+        </button>
+        <button data-id="183" id="btn-auto-refresh-toggle" title="Enable auto price refresh every 15 min" class="flex items-center gap-2 bg-navy-700/80 hover:bg-navy-650/80 text-gold-400 border border-gold-400/30 px-3 py-2 rounded-lg text-xs font-medium transition backdrop-blur" style="min-width:80px;">▶ Auto</button>
+        <button data-id="184" id="btn-update-db" title="Force-update ALL ETF DB prices via Twelve Data right now" class="flex items-center gap-2 bg-navy-700/80 hover:bg-navy-650/80 text-purple-400 border border-purple-400/30 px-3 py-2 rounded-lg text-xs font-medium transition backdrop-blur">🗄️ Update DB</button>
+        <button data-id="185" id="btn-manage-portfolio-log" class="flex items-center gap-2 bg-gold-400/15 hover:bg-gold-400/25 text-gold-400 border border-gold-400/40 px-3 py-2 rounded-lg text-xs font-semibold transition">
+          <span data-id="186" style="font-size:1em;line-height:1;">⚙️</span> Manage Portfolio
+        </button>
+        <button data-id="187" id="btn-edit" class="flex items-center gap-2 bg-navy-700/80 hover:bg-navy-650/80 text-teal-400 border border-teal-400/30 px-3 py-2 rounded-lg text-xs font-medium transition backdrop-blur">
+          <span data-id="188" style="font-size:1em;line-height:1;">✏️</span> Edit Mode
+        </button>
+        <button data-id="189" id="btn-save" class="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-lg text-xs font-medium transition hidden">
+          <span data-id="190" style="font-size:1em;line-height:1;">💾</span> Save Changes
+        </button>
+      </div>
+
+      <div data-id="191" id="refresh-progress-panel" class="refresh-progress-panel mb-4 hidden"></div>
+
+      <div data-id="192" class="card" style="padding:0;overflow:hidden;">
+        <div data-id="193" class="scroll-table">
+        <table data-id="194">
+          <colgroup data-id="195">
+            <col data-id="196" style="width:75px">
+            <col data-id="197" style="width:155px">
+            <col data-id="198" style="width:155px">
+            <col data-id="199" style="width:135px">
+            <col data-id="200" style="width:90px">
+            <col data-id="201" style="width:90px">
+            <col data-id="202" style="width:110px">
+            <col data-id="203" style="width:92px">
+            <col data-id="204" style="width:92px">
+            <col data-id="205" style="width:92px">
+            <col data-id="206" style="width:95px">
+            <col data-id="207" style="width:110px">
+            <col data-id="208" style="width:92px">
+            <col data-id="209" style="width:105px">
+            <col data-id="210" style="width:82px">
+            <col data-id="211" style="width:82px">
+            <col data-id="212" style="width:98px">
+            <col data-id="213" style="width:88px">
+          </colgroup>
+          <thead data-id="214">
+            <tr data-id="215">
+              <th data-id="216">Ticker</th><th data-id="217">ETF Name</th><th data-id="218">Strategy</th><th data-id="219">Pay Group</th><th data-id="220">Shares</th><th data-id="221">Cost Basis</th><th data-id="222">Current Price</th><th data-id="223">Last Ex-Div</th><th data-id="224">Last Pay</th><th data-id="225">Next Pay</th><th data-id="226">Last Dist/Sh</th><th data-id="227">Est Ann Dist</th><th data-id="228">Dist Yield%</th><th data-id="229">Yield/Cost%</th><th data-id="230">Exp Ratio</th><th data-id="231">Weekly $</th><th data-id="232">Annual $</th><th data-id="233">NAV Chg%</th>
+            </tr>
+          </thead>
+          <tbody data-id="234" id="etf-table-body"></tbody>
+          <tfoot data-id="235" id="etf-table-foot"></tfoot>
+        </table>
+        </div>
+      </div>
+
+      <div data-id="236" class="mt-4">
+        <button data-id="237" id="btn-risk-toggle" class="flex items-center gap-2 text-xs text-gold-400 hover:text-gold-300 transition">
+          <span data-id="238" style="font-size:1em;line-height:1;" id="risk-chevron">▼</span> Risk Notes & Disclaimers
+        </button>
+        <div data-id="239" id="risk-notes" class="collapsible-content mt-2 card p-4 text-xs text-gray-400 leading-relaxed">
+          <ul data-id="240" class="list-disc pl-4 space-y-1">
+            <li data-id="241">Covered call ETFs generate income by selling options; this can cap upside during strong rallies.</li>
+            <li data-id="242">High distribution yields often come with NAV erosion — the share price declines over time even as income is paid.</li>
+            <li data-id="243">Weekly distributions are <strong data-id="244">not guaranteed</strong> and can vary significantly from week to week.</li>
+            <li data-id="245">Expense ratios on these funds (0.95%–1.30%) are higher than traditional index ETFs.</li>
+            <li data-id="246">Past distributions are not indicative of future payouts. Always review prospectus and recent filings.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: DASHBOARD -->
+    <div data-id="247" id="tab-dashboard" class="tab-content hidden">
+      <div data-id="248" class="mb-4">
+        <h1 data-id="249" class="text-xl md:text-2xl font-bold text-white">Weekly Income Dashboard — Nick's ETF Portfolio</h1>
+        <p data-id="250" class="text-sm text-gray-400 mt-1" id="dash-date-subtitle"></p>
+      </div>
+      <div data-id="251" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6" id="summary-cards"></div>
+      <div data-id="252" class="card p-4 md:p-6 mb-6">
+        <h2 data-id="253" class="text-lg font-bold text-gold-400 mb-4 flex items-center gap-2">
+          <span data-id="254" style="font-size:1em;line-height:1;">📊</span> Monthly Income Estimate 2026
+        </h2>
+        <div data-id="255" class="relative h-56 md:h-72 mb-4">
+          <canvas data-id="256" id="monthly-chart"></canvas>
+        </div>
+        <div data-id="257" class="scroll-table mt-4">
+          <table data-id="258">
+            <thead data-id="259"><tr data-id="260"><th data-id="261">Month</th><th data-id="262">Thu Weeks</th><th data-id="263">Fri Weeks</th><th data-id="264">Est. Monthly $</th><th data-id="265">% of Annual</th></tr></thead>
+            <tbody data-id="266" id="monthly-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div data-id="267" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div data-id="268" class="card p-4 md:p-6">
+          <h2 data-id="269" class="text-lg font-bold text-gold-400 mb-4 flex items-center gap-2">
+            <span data-id="270" style="font-size:1em;line-height:1;">🥧</span> Strategy Breakdown
+          </h2>
+          <div data-id="271" class="relative h-56 md:h-64 mx-auto" style="max-width:300px;">
+            <canvas data-id="272" id="strategy-chart"></canvas>
+          </div>
+        </div>
+        <div data-id="273" class="card p-4 md:p-6">
+          <h2 data-id="274" class="text-lg font-bold text-gold-400 mb-4">By Strategy Type</h2>
+          <div data-id="275" class="scroll-table">
+            <table data-id="276">
+              <thead data-id="277"><tr data-id="278"><th data-id="279">Strategy</th><th data-id="280">Tickers</th><th data-id="281">#</th><th data-id="282">Weekly $</th><th data-id="283">Annual $</th></tr></thead>
+              <tbody data-id="284" id="strategy-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div data-id="285" class="card p-4 md:p-6 mb-6">
+        <h2 data-id="286" class="text-lg font-bold text-gold-400 mb-4 flex items-center gap-2">
+          <span data-id="287" style="font-size:1em;line-height:1;">🛡</span> Risk Meter
+        </h2>
+        <div data-id="288" class="scroll-table">
+          <table data-id="289">
+            <thead data-id="290"><tr data-id="291"><th data-id="292">Ticker</th><th data-id="293">Dist Yield %</th><th data-id="294">Cost Basis</th><th data-id="295">Current Price</th><th data-id="296">NAV Chg %</th><th data-id="297">Risk Level</th></tr></thead>
+            <tbody data-id="298" id="risk-table-body"></tbody>
+          </table>
+        </div>
+        <p data-id="299" class="text-xs text-gray-500 mt-3 italic">NAV erosion is common in covered call ETFs. High yields may come at the cost of declining share price over time.</p>
+      </div>
+      <div data-id="300" class="card p-4 md:p-6">
+        <h2 data-id="301" class="text-lg font-bold text-gold-400 mb-4 flex items-center gap-2">
+          <span data-id="302" style="font-size:1em;line-height:1;">👛</span> Portfolio Value Summary
+        </h2>
+        <div data-id="303" class="grid grid-cols-2 md:grid-cols-5 gap-4" id="portfolio-value-cards"></div>
+      </div>
+    </div>
+
+    <!-- TAB 3: UPCOMING PAYOUTS -->
+    <div data-id="304" id="tab-payouts" class="tab-content hidden">
+      <div data-id="305" class="mb-4">
+        <h1 data-id="306" class="text-xl md:text-2xl font-bold text-white">Upcoming Weekly Payouts — Next 5 Weeks</h1>
+        <p data-id="307" class="text-sm text-gray-400 mt-1" id="payouts-date-subtitle"></p>
+      </div>
+      <div data-id="308" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6" id="countdown-cards"></div>
+      <div data-id="309" class="card p-4 md:p-6 mb-6">
+        <h2 data-id="310" class="text-lg font-bold text-gold-400 mb-4 flex items-center gap-2">
+          <span data-id="311" style="font-size:1em;line-height:1;">📅</span> Payout Schedule
+        </h2>
+        <div data-id="312" class="scroll-table">
+          <table data-id="313">
+            <thead data-id="314"><tr data-id="315"><th data-id="316">Pay Date</th><th data-id="317">Day</th><th data-id="318">Ticker</th><th data-id="319">ETF Name</th><th data-id="320">Pay Group</th><th data-id="321">Shares</th><th data-id="322">Dist/Sh ($)</th><th data-id="323">Expected Payout ($)</th></tr></thead>
+            <tbody data-id="324" id="payouts-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div data-id="325" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" id="payout-summary-cards"></div>
+      <div data-id="326" class="card p-4 md:p-6">
+        <h2 data-id="327" class="text-lg font-bold text-gold-400 mb-4 flex items-center gap-2">
+          <span data-id="328" style="font-size:1em;line-height:1;">📋</span> Weekly Summary
+        </h2>
+        <div data-id="329" class="scroll-table">
+          <table data-id="330">
+            <thead data-id="331"><tr data-id="332"><th data-id="333">Week</th><th data-id="334">Thursday Payout</th><th data-id="335">Friday Payout</th><th data-id="336">Weekly Total</th></tr></thead>
+            <tbody data-id="337" id="weekly-summary-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer data-id="338" class="py-6 text-center border-t border-gold-400/10" style="position:relative;z-index:2;">
+    <p data-id="339" class="text-xs text-gray-500 max-w-3xl mx-auto px-4 mb-2">Weekly income ETFs using covered call strategies. Distributions vary weekly and are not guaranteed. NAV erosion is a known risk. Not financial advice.</p>
+    <p data-id="340" class="text-xs text-gray-600">Made by Copilot</p>
+  </footer>
+
+  <div data-id="341" id="db-update-toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e1b4b;border:1px solid rgba(167,139,250,0.4);color:#c4b5fd;padding:12px 24px;border-radius:12px;font-size:13px;font-weight:500;z-index:9999;min-width:320px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.5);"></div>
+
+  <script>
+    // sh(el, html) — sets element content WITHOUT using innerHTML property setter
+    // Uses createContextualFragment to avoid Trusted Types policy requirement
+    function sh(el, html) {
+      if (!el) return;
+      while (el.firstChild) el.removeChild(el.firstChild);
+      if (html === null || html === undefined || html === '') return;
+      var s = String(html);
+      if (s === '') return;
+      try {
+        var range = document.createRange();
+        range.selectNode(el);
+        el.appendChild(range.createContextualFragment(s));
+      } catch(e) {
+        el.textContent = s;
+      }
+    }
+
+    // ============================================================
+    // FIX 1: NATURE BACKGROUND SLIDESHOW — AI Generated Images
+    // ============================================================
+    (function() {
+      var NATURE_PROMPTS = [
+        "breathtaking deep space nebula with vivid blues and purples, glowing star clusters, photorealistic astronomy",
+        "majestic spiral galaxy viewed from space, golden core surrounded by sweeping blue arms, cosmic dust, ultra detailed",
+        "astronaut floating in orbit above a glowing blue Earth, Milky Way stretching across background, cinematic lighting",
+        "dramatic supernova explosion in deep space, shockwaves of red and orange plasma, distant stars, photorealistic",
+        "stunning view of Saturn and its rings from space, golden planet, icy ring detail, cinematic, photorealistic"
+      ];
+
+      var slideIndex = 0;
+      var slideInterval = null;
+      var bgContainer = document.getElementById('nature-bg');
+
+      function startSlideRotation() {
+        var slides = bgContainer.querySelectorAll('.nature-slide');
+        if (slides.length < 2) return;
+        if (slideInterval) clearInterval(slideInterval);
+        for (var i = 0; i < slides.length; i++) { slides[i].classList.remove('active'); }
+        slides[0].classList.add('active');
+        slideIndex = 0;
+        slideInterval = setInterval(function() {
+          var allSlides = bgContainer.querySelectorAll('.nature-slide');
+          if (allSlides.length < 2) return;
+          allSlides[slideIndex].classList.remove('active');
+          slideIndex = (slideIndex + 1) % allSlides.length;
+          allSlides[slideIndex].classList.add('active');
+        }, 3600000);
+      }
+
+      async function loadNatureImages() {
+        // Standalone mode: use static gradient backgrounds (no AI image generation)
+        var gradients = [
+          'linear-gradient(135deg, #000010 0%, #0a0a2e 25%, #1a0a3e 50%, #0d1a4a 75%, #020215 100%)',
+          'linear-gradient(135deg, #020215 0%, #0d1a4a 25%, #0a1a2e 50%, #0a0a2e 75%, #000010 100%)',
+          'linear-gradient(135deg, #000818 0%, #071428 30%, #0d1f3c 60%, #040d1f 100%)'
+        ];
+        gradients.forEach(function(g, i) {
+          var slide = document.createElement('div');
+          slide.className = 'nature-slide' + (i === 0 ? ' active' : '');
+          slide.style.background = g;
+          bgContainer.appendChild(slide);
+        });
+        startSlideRotation();
+        else if (loadedCount === 1) {
+          var onlySlide = bgContainer.querySelector('.nature-slide');
+          if (onlySlide) onlySlide.classList.add('active');
+        } else {
+          var fb = document.createElement('div');
+          fb.className = 'nature-slide active';
+          fb.style.background = 'linear-gradient(135deg, #000010 0%, #0a0a2e 25%, #1a0a3e 50%, #0d1a4a 75%, #020215 100%)';
+          bgContainer.appendChild(fb);
+        }
+      }
+
+      loadNatureImages();
+    })();
+
+    // ============================================================
+    // COMPREHENSIVE ETF DATABASE — 100+ Tickers (3-Layer Matching)
+    // ============================================================
+    var ETF_DB = {
+      // ── YieldMax Single-Stock Covered Call ──
+      TSLY:  { name:'YieldMax TSLA Option Income Strategy ETF', underlying:'Tesla TSLA', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.5000, frequency:'Weekly', issuer:'YieldMax', price:8.84 },
+      NVDY:  { name:'YieldMax NVDA Option Income Strategy ETF', underlying:'Nvidia NVDA', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.4000, frequency:'Weekly', issuer:'YieldMax', price:13.05 },
+      CONY:  { name:'YieldMax COIN Option Income Strategy ETF', underlying:'Coinbase COIN', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.8000, frequency:'Weekly', issuer:'YieldMax', price:20.90 },
+      MSTY:  { name:'YieldMax MSTR Option Income Strategy ETF', underlying:'MicroStrategy MSTR', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:1.5000, frequency:'Weekly', issuer:'YieldMax', price:15.36 },
+      PLTY:  { name:'YieldMax PLTR Option Income Strategy ETF', underlying:'Palantir PLTR', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.5000, frequency:'Weekly', issuer:'YieldMax', price:24.80 },
+      GOOGY: { name:'YieldMax GOOGL Option Income Strategy ETF', underlying:'Alphabet GOOGL', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:21.40 },
+      AMZY:  { name:'YieldMax AMZN Option Income Strategy ETF', underlying:'Amazon AMZN', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.2500, frequency:'Weekly', issuer:'YieldMax', price:19.60 },
+      AMDY:  { name:'YieldMax AMD Option Income Strategy ETF', underlying:'AMD', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.3000, frequency:'Weekly', issuer:'YieldMax', price:9.20 },
+      SNOY:  { name:'YieldMax SNOW Option Income Strategy ETF', underlying:'Snowflake SNOW', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:8.70 },
+      CRSY:  { name:'YieldMax CRWD Option Income Strategy ETF', underlying:'CrowdStrike CRWD', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.3000, frequency:'Weekly', issuer:'YieldMax', price:15.30 },
+      MARO:  { name:'YieldMax META Option Income Strategy ETF', underlying:'Meta META', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.2500, frequency:'Weekly', issuer:'YieldMax', price:25.60 },
+      SMCY:  { name:'YieldMax SMCI Option Income Strategy ETF', underlying:'SuperMicro SMCI', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.4000, frequency:'Weekly', issuer:'YieldMax', price:7.20 },
+      APLY:  { name:'YieldMax AAPL Option Income Strategy ETF', underlying:'Apple AAPL', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:21.30 },
+      MSFO:  { name:'YieldMax MSFT Option Income Strategy ETF', underlying:'Microsoft MSFT', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.2500, frequency:'Weekly', issuer:'YieldMax', price:27.40 },
+      NFLY:  { name:'YieldMax NFLX Option Income Strategy ETF', underlying:'Netflix NFLX', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.3000, frequency:'Weekly', issuer:'YieldMax', price:19.50 },
+      JPMO:  { name:'YieldMax JPM Option Income Strategy ETF', underlying:'JPMorgan JPM', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:27.80 },
+      SQY:   { name:'YieldMax SQ Option Income Strategy ETF', underlying:'Block SQ', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:15.10 },
+      XOMO:  { name:'YieldMax XOM Option Income Strategy ETF', underlying:'ExxonMobil XOM', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.2500, frequency:'Weekly', issuer:'YieldMax', price:17.20 },
+      OARK:  { name:'YieldMax Innovation Option Income Strategy ETF', underlying:'ARK Innovation ARKK', strategy:'Covered Call - Thematic', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.3000, frequency:'Weekly', issuer:'YieldMax', price:12.80 },
+      ABNY:  { name:'YieldMax ABNB Option Income Strategy ETF', underlying:'Airbnb ABNB', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:11.40 },
+      PYPY:  { name:'YieldMax PYPL Option Income Strategy ETF', underlying:'PayPal PYPL', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:10.90 },
+      DISO:  { name:'YieldMax DIS Option Income Strategy ETF', underlying:'Disney DIS', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.1500, frequency:'Weekly', issuer:'YieldMax', price:9.46 },
+      TSMY:  { name:'YieldMax TSM Option Income Strategy ETF', underlying:'TSMC TSM', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:16.40 },
+      YBIT:  { name:'YieldMax Bitcoin Option Income Strategy ETF', underlying:'Bitcoin BITO', strategy:'Covered Call - Crypto', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.5000, frequency:'Weekly', issuer:'YieldMax', price:17.60 },
+      FIAT:  { name:'YieldMax Short TSLA Option Income Strategy ETF', underlying:'Short Tesla TSLA', strategy:'Covered Call - Inverse', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.3000, frequency:'Weekly', issuer:'YieldMax', price:7.89 },
+      FBY:   { name:'YieldMax F Option Income Strategy ETF', underlying:'Ford F', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.1500, frequency:'Weekly', issuer:'YieldMax', price:10.80 },
+      MRNY:  { name:'YieldMax MRNA Option Income Strategy ETF', underlying:'Moderna MRNA', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:8.10 },
+      PFIY:  { name:'YieldMax PFE Option Income Strategy ETF', underlying:'Pfizer PFE', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.1500, frequency:'Weekly', issuer:'YieldMax', price:9.20 },
+      GDXY:  { name:'YieldMax Gold Miners Option Income Strategy ETF', underlying:'VanEck Gold Miners GDX', strategy:'Covered Call - Sector', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.2500, frequency:'Weekly', issuer:'YieldMax', price:13.50 },
+      BAMY:  { name:'YieldMax BAC Option Income Strategy ETF', underlying:'Bank of America BAC', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.1500, frequency:'Weekly', issuer:'YieldMax', price:10.20 },
+      CVSY:  { name:'YieldMax CVS Option Income Strategy ETF', underlying:'CVS Health CVS', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.1500, frequency:'Weekly', issuer:'YieldMax', price:9.30 },
+      HOODY: { name:'YieldMax HOOD Option Income Strategy ETF', underlying:'Robinhood HOOD', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:15.40 },
+      SPYY:  { name:'YieldMax SPY Option Income Strategy ETF', underlying:'S&P 500 SPY', strategy:'Covered Call - Index', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.3000, frequency:'Weekly', issuer:'YieldMax', price:48.60 },
+      IWMY:  { name:'YieldMax IWM Option Income Strategy ETF', underlying:'Russell 2000 IWM', strategy:'Covered Call - Index', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.2500, frequency:'Weekly', issuer:'YieldMax', price:21.50 },
+      BIOY:  { name:'YieldMax Biotech Option Income Strategy ETF', underlying:'Biotech XBI', strategy:'Covered Call - Sector', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:8.60 },
+      OZEM:  { name:'YieldMax NOVO B Option Income Strategy ETF', underlying:'Novo Nordisk NVO Ozempic', strategy:'Covered Call - Single Stock', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:19.20 },
+      AAPY:  { name:'YieldMax AAPL Option Income Strategy ETF (Alt)', underlying:'Apple AAPL', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:21.30 },
+      // ── YieldMax Portfolio/Multi-Asset Funds ──
+      YMAX:  { name:'YieldMax Universe Fund of Option Income ETFs', underlying:'YieldMax ETF basket', strategy:'Fund of Funds - YieldMax', payGroup:'Group 1 - Thursday', expenseRatio:0.29, lastDist:0.5000, frequency:'Weekly', issuer:'YieldMax', price:8.11 },
+      YMAG:  { name:'YieldMax Magnificent 7 Fund of Option Income ETFs', underlying:'Mag7 stocks', strategy:'Fund of Funds - Mag7', payGroup:'Group 1 - Thursday', expenseRatio:0.29, lastDist:0.4000, frequency:'Weekly', issuer:'YieldMax', price:11.75 },
+      ULTY:  { name:'YieldMax Ultra Option Income Strategy ETF', underlying:'Multi-asset', strategy:'Covered Call - Multi-Asset', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.2000, frequency:'Weekly', issuer:'YieldMax', price:30.37 },
+      CHPY:  { name:'YieldMax Semiconductor Portfolio Option Income ETF', underlying:'Semiconductor stocks', strategy:'Covered Call - Semiconductor Portfolio', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.2500, frequency:'Weekly', issuer:'YieldMax', price:15.20 },
+      BIGY:  { name:'YieldMax Big Tech Option Income Strategy ETF', underlying:'Big tech basket', strategy:'Covered Call - Tech Portfolio', payGroup:'Group 1 - Thursday', expenseRatio:0.99, lastDist:0.3000, frequency:'Weekly', issuer:'YieldMax', price:21.80 },
+      FIVY:  { name:'YieldMax Fab 5 Fund of Option Income ETFs', underlying:'Top 5 YieldMax ETFs', strategy:'Fund of Funds - YieldMax', payGroup:'Group 2 - Friday', expenseRatio:0.29, lastDist:0.4000, frequency:'Weekly', issuer:'YieldMax', price:24.55 },
+      YUMY:  { name:'YieldMax ULTY Option Income Strategy ETF', underlying:'ULTY', strategy:'Fund of Funds - YieldMax', payGroup:'Group 1 - Thursday', expenseRatio:0.29, lastDist:0.3000, frequency:'Weekly', issuer:'YieldMax', price:7.90 },
+      // ── Roundhill 0DTE ──
+      QDTE:  { name:'Roundhill S&P 500 0DTE Covered Call Strategy ETF', underlying:'S&P 500 SPX', strategy:'Covered Call - Index 0DTE', payGroup:'Friday (Roundhill)', expenseRatio:0.95, lastDist:0.1500, frequency:'Weekly', issuer:'Roundhill', price:31.17 },
+      RDTE:  { name:'Roundhill Innovation-100 0DTE Covered Call Strategy ETF', underlying:'Nasdaq-100 NDX', strategy:'Covered Call - Index 0DTE', payGroup:'Friday (Roundhill)', expenseRatio:0.95, lastDist:0.1200, frequency:'Weekly', issuer:'Roundhill', price:28.77 },
+      WDTE:  { name:'Roundhill S&P 500 Target 10 Hedged Equity ETF', underlying:'S&P 500', strategy:'Covered Call - Hedged Index', payGroup:'Friday (Roundhill)', expenseRatio:0.95, lastDist:0.1000, frequency:'Weekly', issuer:'Roundhill', price:26.40 },
+      XDTE:  { name:'Roundhill S&P 500 Target 12 Hedged Equity ETF', underlying:'S&P 500', strategy:'Covered Call - Hedged Index', payGroup:'Friday (Roundhill)', expenseRatio:0.95, lastDist:0.1100, frequency:'Weekly', issuer:'Roundhill', price:38.93 },
+      // ── NEOS High Income ──
+      SPYI:  { name:'NEOS S&P 500 High Income ETF', underlying:'S&P 500', strategy:'Covered Call - Index', payGroup:'Monthly', expenseRatio:0.68, lastDist:0.5000, frequency:'Monthly', issuer:'NEOS', price:53.15 },
+      QQQI:  { name:'NEOS Nasdaq-100 High Income ETF', underlying:'Nasdaq-100', strategy:'Covered Call - Index', payGroup:'Monthly', expenseRatio:0.68, lastDist:0.5000, frequency:'Monthly', issuer:'NEOS', price:56.32 },
+      IWMI:  { name:'NEOS Russell 2000 High Income ETF', underlying:'Russell 2000', strategy:'Covered Call - Index', payGroup:'Monthly', expenseRatio:0.68, lastDist:0.4000, frequency:'Monthly', issuer:'NEOS', price:25.40 },
+      CSHI:  { name:'NEOS Cash Alternative ETF', underlying:'T-Bills', strategy:'Cash Alternative', payGroup:'Monthly', expenseRatio:0.38, lastDist:0.3500, frequency:'Monthly', issuer:'NEOS', price:50.80 },
+      // ── JPMorgan Premium Income ──
+      JEPI:  { name:'JPMorgan Equity Premium Income ETF', underlying:'S&P 500 stocks', strategy:'ELN Covered Call - Large Cap', payGroup:'Monthly', expenseRatio:0.35, lastDist:0.4500, frequency:'Monthly', issuer:'JPMorgan', price:56.66 },
+      JEPQ:  { name:'JPMorgan Nasdaq Equity Premium Income ETF', underlying:'Nasdaq-100 stocks', strategy:'ELN Covered Call - Growth', payGroup:'Monthly', expenseRatio:0.35, lastDist:0.5000, frequency:'Monthly', issuer:'JPMorgan', price:61.18 },
+      // ── Global X Covered Call ──
+      QYLD:  { name:'Global X Nasdaq-100 Covered Call ETF', underlying:'Nasdaq-100 QQQ', strategy:'Covered Call - Index', payGroup:'Monthly', expenseRatio:0.60, lastDist:0.1500, frequency:'Monthly', issuer:'Global X', price:18.23 },
+      XYLD:  { name:'Global X S&P 500 Covered Call ETF', underlying:'S&P 500 SPY', strategy:'Covered Call - Index', payGroup:'Monthly', expenseRatio:0.60, lastDist:0.3500, frequency:'Monthly', issuer:'Global X', price:40.94 },
+      RYLD:  { name:'Global X Russell 2000 Covered Call ETF', underlying:'Russell 2000 IWM', strategy:'Covered Call - Index', payGroup:'Monthly', expenseRatio:0.60, lastDist:0.1200, frequency:'Monthly', issuer:'Global X', price:15.72 },
+      DJIA:  { name:'Global X Dow 30 Covered Call ETF', underlying:'Dow Jones DJIA', strategy:'Covered Call - Index', payGroup:'Monthly', expenseRatio:0.60, lastDist:0.2500, frequency:'Monthly', issuer:'Global X', price:37.80 },
+      QRMI:  { name:'Global X Nasdaq-100 Risk Managed Income ETF', underlying:'Nasdaq-100', strategy:'Collar - Index', payGroup:'Monthly', expenseRatio:0.60, lastDist:0.2000, frequency:'Monthly', issuer:'Global X', price:25.10 },
+      XRMI:  { name:'Global X S&P 500 Risk Managed Income ETF', underlying:'S&P 500', strategy:'Collar - Index', payGroup:'Monthly', expenseRatio:0.60, lastDist:0.3000, frequency:'Monthly', issuer:'Global X', price:52.40 },
+      ALTY:  { name:'Global X Alternative Income ETF', underlying:'Multi-asset alternatives', strategy:'Multi-Strategy Income', payGroup:'Monthly', expenseRatio:1.50, lastDist:0.1000, frequency:'Monthly', issuer:'Global X', price:13.90 },
+      // ── Defiance ETFs ──
+      JEPY:  { name:'Defiance S&P 500 Enhanced Options & 0DTE Income ETF', underlying:'S&P 500', strategy:'Covered Call - Index 0DTE', payGroup:'Monthly', expenseRatio:0.99, lastDist:0.3000, frequency:'Monthly', issuer:'Defiance', price:16.10 },
+      WKLY:  { name:'Defiance Weekly Target Income ETF', underlying:'S&P 500', strategy:'Covered Call - Weekly Income', payGroup:'Monthly', expenseRatio:0.99, lastDist:0.2500, frequency:'Monthly', issuer:'Defiance', price:18.30 },
+      QQQY:  { name:'Defiance Nasdaq-100 Enhanced Options & 0DTE Income ETF', underlying:'Nasdaq-100', strategy:'Covered Call - Index 0DTE', payGroup:'Monthly', expenseRatio:0.99, lastDist:0.3500, frequency:'Monthly', issuer:'Defiance', price:14.20 },
+      IWMY2: { name:'Defiance R2000 Enhanced Options & 0DTE Income ETF', underlying:'Russell 2000', strategy:'Covered Call - Index 0DTE', payGroup:'Monthly', expenseRatio:0.99, lastDist:0.2500, frequency:'Monthly', issuer:'Defiance', price:14.40 },
+      // ── REX Shares ──
+      FEPI:  { name:'REX FANG & Innovation Equity Premium Income ETF', underlying:'FANG+ stocks', strategy:'Covered Call - Tech Portfolio', payGroup:'Monthly', expenseRatio:0.65, lastDist:0.5000, frequency:'Monthly', issuer:'REX', price:51.62 },
+      // ── KraneShares ──
+      KLIP:  { name:'KraneShares China Internet & Covered Call Strategy ETF', underlying:'China internet KWEB', strategy:'Covered Call - China Tech', payGroup:'Monthly', expenseRatio:0.95, lastDist:0.8000, frequency:'Monthly', issuer:'KraneShares', price:11.20 },
+      // ── Amplify ──
+      DIVO:  { name:'Amplify CWP Enhanced Dividend Income ETF', underlying:'US dividend stocks', strategy:'Covered Call - Dividend Growth', payGroup:'Monthly', expenseRatio:0.55, lastDist:0.3000, frequency:'Monthly', issuer:'Amplify', price:46.69 },
+      HIGH:  { name:'Amplify High Income ETF', underlying:'Multi-asset high income', strategy:'Multi-Strategy Income', payGroup:'Monthly', expenseRatio:0.85, lastDist:0.4000, frequency:'Monthly', issuer:'Amplify', price:18.40 },
+      // ── Nationwide ──
+      NUSI:  { name:'Nationwide Risk-Managed Income ETF', underlying:'Nasdaq-100', strategy:'Collar - Nasdaq-100', payGroup:'Monthly', expenseRatio:0.68, lastDist:0.2500, frequency:'Monthly', issuer:'Nationwide', price:25.20 },
+      // ── Innovator ──
+      BALT:  { name:'Innovator Defined Wealth Shield ETF', underlying:'S&P 500', strategy:'Buffered - Defined Outcome', payGroup:'Monthly', expenseRatio:0.79, lastDist:0.1500, frequency:'Monthly', issuer:'Innovator', price:28.60 }
+    };
+
+    // Alias map: alternate symbols or common misspellings → correct DB key
+    var ETF_ALIASES = {
+      'AMZNY': 'AMZY', 'TSLAYIELD': 'TSLY', 'NVDAYIELD': 'NVDY',
+      'COINBASE': 'CONY', 'MICROSTRATEGY': 'MSTY', 'PALANTIR': 'PLTY',
+      'GOOGLE': 'GOOGY', 'ALPHABET': 'GOOGY', 'AMAZON': 'AMZY',
+      'NVIDIA': 'NVDY', 'APPLE': 'APLY', 'MICROSOFT': 'MSFO',
+      'META': 'MARO', 'NETFLIX': 'NFLY', 'DISNEY': 'DISO',
+      'SNOWFLAKE': 'SNOY', 'CROWDSTRIKE': 'CRSY', 'FORD': 'FBY',
+      'MODERNA': 'MRNY', 'PFIZER': 'PFIY', 'PAYPAL': 'PYPY',
+      'ROBINHOOD': 'HOODY', 'AIRBNB': 'ABNY', 'TSMC': 'TSMY',
+      'SEMICONDUCTOR': 'CHPY', 'BITCOIN': 'YBIT',
+      'SP500': 'SPYI', 'SPX': 'SPYI', 'NASDAQ': 'QQQI', 'QQQ': 'QQQI',
+      'RUSSELL': 'IWMI', 'RUSSELL2000': 'IWMI',
+      'JPMORGAN': 'JEPI', 'JPMORGANNASDQ': 'JEPQ'
+    };
+
+    // ============================================================
+    // LAYER 2: Smart Multi-Strategy Matching Engine
+    // ============================================================
+    function smartLookup(input) {
+      if (!input) return null;
+      var sym = input.toUpperCase().trim().replace(/[^A-Z0-9]/g, '');
+      if (!sym) return null;
+
+      // Strategy 1: Exact match
+      if (ETF_DB[sym]) {
+        var exact = {};
+        for (var k in ETF_DB[sym]) exact[k] = ETF_DB[sym][k];
+        exact.symbol = sym;
+        exact.matchType = 'exact';
+        return exact;
+      }
+
+      // Strategy 2: Alias map
+      if (ETF_ALIASES[sym]) {
+        var aliasKey = ETF_ALIASES[sym];
+        if (ETF_DB[aliasKey]) {
+          var aliasResult = {};
+          for (var ak in ETF_DB[aliasKey]) aliasResult[ak] = ETF_DB[aliasKey][ak];
+          aliasResult.symbol = aliasKey;
+          aliasResult.matchType = 'alias';
+          return aliasResult;
+        }
+      }
+
+      // Strategy 3: Prefix match (first 4 chars, then 3)
+      var prefix4 = sym.slice(0, 4);
+      var prefix3 = sym.slice(0, 3);
+      var dbKeys = Object.keys(ETF_DB);
+
+      for (var pi = 0; pi < dbKeys.length; pi++) {
+        if (dbKeys[pi].indexOf(prefix4) === 0 && prefix4.length >= 3) {
+          var prefixResult = {};
+          for (var pk in ETF_DB[dbKeys[pi]]) prefixResult[pk] = ETF_DB[dbKeys[pi]][pk];
+          prefixResult.symbol = dbKeys[pi];
+          prefixResult.matchType = 'prefix';
+          prefixResult.inputWas = sym;
+          return prefixResult;
+        }
+      }
+
+      // Strategy 4: Name/underlying search (keyword match)
+      var words = sym.toLowerCase().split(/\s+/);
+      var bestMatch = null;
+      var bestScore = 0;
+      for (var ni = 0; ni < dbKeys.length; ni++) {
+        var entry = ETF_DB[dbKeys[ni]];
+        var searchStr = (entry.name + ' ' + (entry.underlying || '') + ' ' + entry.strategy + ' ' + (entry.issuer || '') + ' ' + dbKeys[ni]).toLowerCase();
+        var score = 0;
+        for (var wi = 0; wi < words.length; wi++) {
+          if (words[wi].length >= 3 && searchStr.indexOf(words[wi]) !== -1) score++;
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          var nameResult = {};
+          for (var nk in entry) nameResult[nk] = entry[nk];
+          nameResult.symbol = dbKeys[ni];
+          nameResult.matchType = 'name-search';
+          bestMatch = nameResult;
+        }
+      }
+      if (bestScore > 0) return bestMatch;
+
+      // Strategy 5: Levenshtein distance (within 2 edits)
+      function lev(a, b) {
+        var rows = a.length + 1;
+        var cols = b.length + 1;
+        var dp = [];
+        for (var li = 0; li < rows; li++) {
+          dp[li] = [];
+          dp[li][0] = li;
+        }
+        for (var lj = 0; lj <= b.length; lj++) dp[0][lj] = lj;
+        for (var li2 = 1; li2 <= a.length; li2++) {
+          for (var lj2 = 1; lj2 <= b.length; lj2++) {
+            if (a[li2 - 1] === b[lj2 - 1]) {
+              dp[li2][lj2] = dp[li2 - 1][lj2 - 1];
+            } else {
+              dp[li2][lj2] = 1 + Math.min(dp[li2 - 1][lj2], dp[li2][lj2 - 1], dp[li2 - 1][lj2 - 1]);
+            }
+          }
+        }
+        return dp[a.length][b.length];
+      }
+      var closestKey = null;
+      var closestDist = 99;
+      for (var fi = 0; fi < dbKeys.length; fi++) {
+        var d = lev(sym, dbKeys[fi]);
+        if (d < closestDist) { closestDist = d; closestKey = dbKeys[fi]; }
+      }
+      if (closestDist <= 2 && closestKey) {
+        var fuzzyResult = {};
+        for (var fk in ETF_DB[closestKey]) fuzzyResult[fk] = ETF_DB[closestKey][fk];
+        fuzzyResult.symbol = closestKey;
+        fuzzyResult.matchType = 'fuzzy';
+        fuzzyResult.inputWas = sym;
+        fuzzyResult.editDistance = closestDist;
+        return fuzzyResult;
+      }
+
+      // Strategy 6: Pattern inference — guess issuer/type from symbol shape
+      var inferredEntry = null;
+      if (/Y$/.test(sym) && sym.length >= 4) {
+        inferredEntry = { name: sym + ' Option Income ETF (YieldMax-style)', strategy: 'Covered Call - Single Stock', payGroup: 'Group 1 - Thursday', expenseRatio: 0.99, lastDist: 0.2500, frequency: 'Weekly', issuer: 'YieldMax (inferred)', matchType: 'pattern' };
+      } else if (/I$/.test(sym)) {
+        inferredEntry = { name: sym + ' High Income ETF (NEOS-style)', strategy: 'Covered Call - Index', payGroup: 'Monthly', expenseRatio: 0.68, lastDist: 0.3000, frequency: 'Monthly', issuer: 'NEOS (inferred)', matchType: 'pattern' };
+      } else if (/O$/.test(sym)) {
+        inferredEntry = { name: sym + ' Option Income ETF (JPMorgan-style)', strategy: 'ELN Covered Call', payGroup: 'Monthly', expenseRatio: 0.35, lastDist: 0.3000, frequency: 'Monthly', issuer: 'JPMorgan (inferred)', matchType: 'pattern' };
+      }
+      if (inferredEntry) {
+        inferredEntry.symbol = sym;
+        return inferredEntry;
+      }
+
+      return null;
+    }
+
+    // ============================================================
+    // LAYER 3: lookupTicker with AI fallback + "Did you mean?" + DB price
+    // ============================================================
+    function updateLookupStatus(message, type) {
+      var status = document.getElementById('mp-lookup-status');
+      if (!status) return;
+      status.classList.remove('hidden');
+      var colorClass = 'text-gray-400';
+      if (type === 'success') colorClass = 'text-teal-400';
+      else if (type === 'info') colorClass = 'text-blue-400';
+      else if (type === 'warning') colorClass = 'text-yellow-400';
+      else if (type === 'error') colorClass = 'text-red-400';
+      else if (type === 'loading') colorClass = 'text-gold-400 animate-pulse-slow';
+      status.className = 'text-xs mb-2 ' + colorClass;
+      if (type === 'loading') {
+        sh(status, '<span class="mini-spinner" style="margin-right:6px;"></span> ' + message);
+      } else {
+        status.textContent = message;
+      }
+    }
+
+    async function lookupTicker(symbol) {
+      var sym = symbol.toUpperCase().trim();
+
+      // Run smart local lookup first
+      updateLookupStatus('Searching ETF database (' + Object.keys(ETF_DB).length + ' tickers)...', 'loading');
+      var dbResult = smartLookup(sym);
+
+      if (dbResult && dbResult.matchType === 'exact') {
+        var dbPrice = dbResult.price || (ETF_DB[sym] ? ETF_DB[sym].price : null) || null;
+
+        // Try to get a live price from Twelve Data for exact matches
+        updateLookupStatus('📚 Found in DB — fetching live price from Twelve Data…', 'loading');
+        try {
+          var tdPrices = await fetchTDPrices([sym]);
+          if (tdPrices[sym] && tdPrices[sym] > 0) {
+            dbResult.currentPrice = tdPrices[sym];
+            updateLookupStatus('📚 Found in ETF Database • 💲 Live Price: $' + tdPrices[sym].toFixed(2), 'success');
+            return dbResult;
+          }
+        } catch(e) {}
+
+        if (dbPrice) dbResult.currentPrice = dbPrice;
+        updateLookupStatus(dbPrice ? '📚 Found in ETF Database • 💲 Price: $' + dbPrice.toFixed(2) : '📚 Found in ETF Database', 'success');
+        return dbResult;
+      }
+
+      if (dbResult && dbResult.matchType !== 'pattern') {
+        var msg = '';
+        if (dbResult.matchType === 'fuzzy') {
+          msg = '📚 Did you mean ' + dbResult.symbol + '? (' + dbResult.name + ')';
+        } else if (dbResult.matchType === 'alias') {
+          msg = '📚 Matched alias → ' + dbResult.symbol + ' — ' + dbResult.name;
+        } else if (dbResult.matchType === 'prefix') {
+          msg = '📚 Prefix match: ' + dbResult.symbol + ' — ' + dbResult.name;
+        } else if (dbResult.matchType === 'name-search') {
+          msg = '📚 Found close match: ' + dbResult.symbol + ' — ' + dbResult.name;
+        } else {
+          msg = '📚 Found: ' + dbResult.symbol + ' — ' + dbResult.name;
+        }
+        var resolvedKey = dbResult.symbol || sym;
+        var dbPrice2 = dbResult.price || (ETF_DB[resolvedKey] ? ETF_DB[resolvedKey].price : null) || null;
+
+        // Try live price from Twelve Data
+        try {
+          var tdPrices2 = await fetchTDPrices([resolvedKey]);
+          if (tdPrices2[resolvedKey] && tdPrices2[resolvedKey] > 0) {
+            dbResult.currentPrice = tdPrices2[resolvedKey];
+            updateLookupStatus(msg + ' • 💲 Live: $' + tdPrices2[resolvedKey].toFixed(2), 'success');
+            return dbResult;
+          }
+        } catch(e) {}
+
+        if (dbPrice2) dbResult.currentPrice = dbPrice2;
+        updateLookupStatus(dbPrice2 ? msg + ' • 💲 Price: $' + dbPrice2.toFixed(2) : msg, dbPrice2 ? 'success' : 'info');
+        return dbResult;
+      }
+
+      // Try Twelve Data for unknown tickers
+      updateLookupStatus('🌐 Fetching price from Twelve Data…', 'loading');
+      try {
+        var tdPrices3 = await fetchTDPrices([sym]);
+        if (tdPrices3[sym] && tdPrices3[sym] > 0) {
+          var tdResult = dbResult || { symbol: sym, name: sym + ' ETF', strategy: '', payGroup: 'Group 1 - Thursday', expenseRatio: 0.99, lastDist: 0, frequency: 'Weekly', matchType: 'manual' };
+          tdResult.symbol = sym;
+          tdResult.currentPrice = tdPrices3[sym];
+          updateLookupStatus('💲 Live Price: $' + tdPrices3[sym].toFixed(2) + ' — please verify other fields', 'success');
+          return tdResult;
+        }
+      } catch(e) {}
+
+      // Fetch live price from Twelve Data for this ticker
+      updateLookupStatus('📶 Fetching live price from Twelve Data...', 'loading');
+      try {
+        var tdResult = await fetchTDPrices([sym]);
+        if (tdResult[sym] && tdResult[sym] > 0) {
+          var livePrice = tdResult[sym];
+          var base = dbResult || {};
+          var merged = {};
+          for (var bk in base) merged[bk] = base[bk];
+          merged.symbol = sym;
+          merged.currentPrice = livePrice;
+          merged.source = 'twelvedata';
+          merged.matchType = 'twelvedata';
+          updateLookupStatus('💲 Live price: $' + livePrice.toFixed(2) + ' (Twelve Data)', 'success');
+          return merged;
+        }
+      } catch(e) {
+        console.warn('Twelve Data lookup failed:', e.message || e);
+      }
+
+
+      // All failed — return pattern inference or blank manual entry
+      if (dbResult) {
+        var patternPrice = dbResult.price || null;
+        if (patternPrice) dbResult.currentPrice = patternPrice;
+        updateLookupStatus(patternPrice ? '⚠️ Using pattern-based estimate • 💲 Price: $' + patternPrice.toFixed(2) + ' — please verify fields' : '⚠️ Using pattern-based estimate — please verify fields', 'warning');
+        return dbResult;
+      }
+      // Manual entry — nothing was found
+      updateLookupStatus('✏️ Not found — please fill in details manually', 'warning');
+      return { symbol: sym, name: '', strategy: '', payGroup: 'Group 1 - Thursday', expenseRatio: 0.99, currentPrice: 0, lastDist: 0, frequency: 'Weekly', matchType: 'manual' };
+    }
+
+
+    // === TOAST SYSTEM ===
+    function showToast(message, type, duration) {
+      type = type || 'success';
+      duration = duration || 4500;
+      var container = document.getElementById('toast-container');
+      var toast = document.createElement('div');
+      toast.className = 'toast toast-' + type;
+      toast.textContent = message;
+      container.appendChild(toast);
+      requestAnimationFrame(function() { requestAnimationFrame(function() { toast.classList.add('show'); }); });
+      setTimeout(function() {
+        toast.classList.remove('show');
+        setTimeout(function() { toast.remove(); }, 400);
+      }, duration);
+    }
+
+    // === BULLET-PROOF JSON EXTRACTION with error response detection ===
+    function isErrorResponse(obj) {
+      if (!obj || typeof obj !== 'object') return false;
+      if (obj.status === 404 || obj.status === 400 || obj.status === 500) return true;
+      if (obj.title === 'Not Found') return true;
+      if (obj.error === true || obj.error === 'unknown') return true;
+      if (typeof obj.type === 'string' && obj.type.indexOf('rfc9110') !== -1) return true;
+      if (obj.traceId && !obj.name && !obj.currentPrice) return true;
+      return false;
+    }
+
+    function extractJSON(raw) {
+      if (!raw) return null;
+      var s;
+      if (typeof raw === 'string') {
+        s = raw.replace(/```json/gi,'').replace(/```/gi,'').trim();
+      } else if (typeof raw === 'object') {
+        if (isErrorResponse(raw)) return null;
+        return raw;
+      } else {
+        return null;
+      }
+      if (s.indexOf('"Not Found"') !== -1 || s.indexOf('rfc9110') !== -1 || s.indexOf('"traceId"') !== -1) return null;
+      var parsed;
+      try { parsed = JSON.parse(s); if (!isErrorResponse(parsed)) return parsed; return null; } catch(e) {}
+      var m = s.match(/\{[\s\S]*?\}/);
+      if (m) { try { parsed = JSON.parse(m[0]); if (!isErrorResponse(parsed)) return parsed; } catch(e) {} }
+      var m2 = s.match(/\{[\s\S]*\}/);
+      if (m2) { try { parsed = JSON.parse(m2[0]); if (!isErrorResponse(parsed)) return parsed; } catch(e) {} }
+      return null;
+    }
+
+    // Helper — extract string content from an AI response object (legacy, kept for compatibility)
+    function getAIContent(res) {
+      if (!res) return '';
+      if (typeof res === 'string') return res;
+      return String(res);
+    }
+
+    // === PORTFOLIO DATA ===
+    var DEFAULT_DATA = [
+      { ticker:'YMAX', name:'YieldMax Universe Fund', strategy:'Covered Call (Fund of Funds)', payGroup:'Group 1 - Thursday', shares:200, costBasis:9.50, currentPrice:8.11, lastDist:0.0795, expenseRatio:1.28, lastExDiv:'2026-06-17', lastPayDate:'2026-06-18', nextPayDate:'2026-06-25', group:'thu' },
+      { ticker:'YMAG', name:'YieldMax Magnificent 7 Fund', strategy:'Covered Call (Fund of Funds)', payGroup:'Group 2 - Friday', shares:150, costBasis:14.00, currentPrice:11.75, lastDist:0.1006, expenseRatio:1.12, lastExDiv:'2026-06-18', lastPayDate:'2026-06-19', nextPayDate:'2026-06-26', group:'fri' },
+      { ticker:'CONY', name:'YieldMax COIN Option Income ETF', strategy:'Covered Call - Crypto', payGroup:'Group 1 - Thursday', shares:50, costBasis:13.00, currentPrice:20.90, lastDist:0.3500, expenseRatio:1.01, lastExDiv:'2026-06-17', lastPayDate:'2026-06-18', nextPayDate:'2026-06-25', group:'thu' },
+      { ticker:'MSTY', name:'YieldMax MSTR Option Income ETF', strategy:'Covered Call - Crypto', payGroup:'Group 1 - Thursday', shares:75, costBasis:15.00, currentPrice:15.36, lastDist:0.4500, expenseRatio:0.99, lastExDiv:'2026-06-17', lastPayDate:'2026-06-18', nextPayDate:'2026-06-25', group:'thu' },
+      { ticker:'TSLY', name:'YieldMax TSLA Option Income ETF', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', shares:100, costBasis:13.50, currentPrice:8.84, lastDist:0.1800, expenseRatio:1.01, lastExDiv:'2026-06-18', lastPayDate:'2026-06-19', nextPayDate:'2026-06-26', group:'fri' },
+      { ticker:'NVDY', name:'YieldMax NVDA Option Income ETF', strategy:'Covered Call - Single Stock', payGroup:'Group 2 - Friday', shares:80, costBasis:24.00, currentPrice:13.05, lastDist:0.2500, expenseRatio:1.01, lastExDiv:'2026-06-18', lastPayDate:'2026-06-19', nextPayDate:'2026-06-26', group:'fri' },
+      { ticker:'QDTE', name:'Roundhill Innovation-100 0DTE Covered Call ETF', strategy:'0DTE Covered Call', payGroup:'Friday (Roundhill)', shares:120, costBasis:46.00, currentPrice:31.17, lastDist:0.3500, expenseRatio:0.95, lastExDiv:'2026-06-18', lastPayDate:'2026-06-19', nextPayDate:'2026-06-26', group:'fri' },
+      { ticker:'ULTY', name:'YieldMax Ultra Option Income Strategy ETF', strategy:'Multi-Asset Covered Call', payGroup:'Group 2 - Friday', shares:500, costBasis:3.20, currentPrice:30.37, lastDist:0.3485, expenseRatio:1.30, lastExDiv:'2026-06-18', lastPayDate:'2026-06-19', nextPayDate:'2026-06-26', group:'fri' }
+    ];
+
+    var portfolio = JSON.parse(JSON.stringify(DEFAULT_DATA));
+    var editMode = false;
+    var lastUpdated = null;
+    var monthlyChart = null;
+    var strategyChart = null;
+    var staleTickers = new Set();
+    var priceSourceMap = {};
+    var confirmingRemove = null;
+    var lookupCache = {};
+    var priceCache = {};
+    var PRICE_CACHE_TTL = 15 * 60 * 1000;
+
+    var TD_API_KEY = '05919786e95a41f393f680e8364ba62b';
+    var TD_BASE = 'https://api.twelvedata.com/price';
+
+    // Fetch real-time prices from Twelve Data for a batch of symbols
+    // Returns a plain object { TICKER: price } with only successfully-parsed entries
+    async function fetchTDPrices(symbols) {
+      var result = {};
+      if (!symbols || symbols.length === 0) return result;
+      try {
+        var url = TD_BASE + '?symbol=' + symbols.join(',') + '&apikey=' + TD_API_KEY;
+        var res = await fetch(url);
+        if (!res.ok) return result;
+        var data = await res.json();
+        if (symbols.length === 1) {
+          // Single symbol returns { price: "12.34" } or { code: 400, ... }
+          var sym = symbols[0];
+          if (data && data.price) {
+            var p = parseFloat(data.price);
+            if (!isNaN(p) && p > 0) result[sym] = p;
+          }
+        } else {
+          // Multiple symbols returns { TICKER: { price: "12.34" }, ... }
+          symbols.forEach(function(sym) {
+            if (data[sym] && data[sym].price) {
+              var p = parseFloat(data[sym].price);
+              if (!isNaN(p) && p > 0) result[sym] = p;
+            }
+          });
+        }
+      } catch(e) {
+        console.warn('Twelve Data fetch error:', e);
+      }
+      return result;
+    }
+
+    var LS_PORTFOLIO = 'ndt_portfolio_data';
+    var LS_CACHE     = 'ndt_lookup_cache';
+    var LS_PRICES    = 'ndt_price_cache';
+
+    async function saveData() {
+      try { localStorage.setItem(LS_PORTFOLIO, JSON.stringify({ portfolio: portfolio, lastUpdated: lastUpdated })); } catch(e) { console.error('Save error:', e); }
+    }
+    async function loadData() {
+      try { var raw = localStorage.getItem(LS_PORTFOLIO); if (raw) { var doc = JSON.parse(raw); if (doc.portfolio && doc.portfolio.length > 0) { portfolio = doc.portfolio; lastUpdated = doc.lastUpdated || null; } } } catch(e) {}
+      try { var raw2 = localStorage.getItem(LS_CACHE); if (raw2) { lookupCache = JSON.parse(raw2); } } catch(e) {}
+      try { var raw3 = localStorage.getItem(LS_PRICES); if (raw3) { priceCache = JSON.parse(raw3); } } catch(e) {}
+    }
+    async function saveLookupCache() { try { localStorage.setItem(LS_CACHE, JSON.stringify(lookupCache)); } catch(e) {} }
+    async function savePriceCache() { try { localStorage.setItem(LS_PRICES, JSON.stringify(priceCache)); } catch(e) {} }
+
+    // === HELPERS ===
+    var fmt = function(v,d) { d=d||2; return Number(v).toFixed(d); };
+    var fmtC = function(v,d) { d=d||2; return '$' + Number(v).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); };
+    var fmtP = function(v,d) { d=d||2; return Number(v).toFixed(d) + '%'; };
+    var TODAY = new Date(2026, 5, 18);
+
+    function daysBetween(d1, d2) { var a = new Date(d1); a.setHours(0,0,0,0); var b = new Date(d2); b.setHours(0,0,0,0); return Math.round((b - a) / 86400000); }
+    function formatDate(dateStr) { if (!dateStr) return '—'; var d = new Date(dateStr + 'T00:00:00'); return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }); }
+    function getDayName(dateStr) { return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday:'long' }); }
+    function payGroupToGroup(payGroup) { if (!payGroup) return 'fri'; var pg = payGroup.toLowerCase(); if (pg.indexOf('thursday') !== -1 || pg.indexOf('thu') !== -1) return 'thu'; return 'fri'; }
+    function yahooUrl(symbol) { return 'https://finance.yahoo.com/quote/' + encodeURIComponent(symbol) + '/'; }
+
+    function calc(etf) {
+      var annDist = etf.lastDist * 52;
+      var distYield = etf.currentPrice > 0 ? (annDist / etf.currentPrice) * 100 : 0;
+      var yieldOnCost = etf.costBasis > 0 ? (annDist / etf.costBasis) * 100 : 0;
+      var weeklyIncome = etf.lastDist * etf.shares;
+      var annualIncome = weeklyIncome * 52;
+      var navChange = etf.costBasis > 0 ? ((etf.currentPrice - etf.costBasis) / etf.costBasis) * 100 : 0;
+      return { annDist:annDist, distYield:distYield, yieldOnCost:yieldOnCost, weeklyIncome:weeklyIncome, annualIncome:annualIncome, navChange:navChange };
+    }
+
+    var monthlyPayWeeks = [
+      { month:'Jan', thu:4, fri:4 }, { month:'Feb', thu:4, fri:4 },
+      { month:'Mar', thu:5, fri:4 }, { month:'Apr', thu:4, fri:4 },
+      { month:'May', thu:4, fri:5 }, { month:'Jun', thu:4, fri:4 },
+      { month:'Jul', thu:4, fri:4 }, { month:'Aug', thu:5, fri:5 },
+      { month:'Sep', thu:4, fri:4 }, { month:'Oct', thu:5, fri:4 },
+      { month:'Nov', thu:4, fri:4 }, { month:'Dec', thu:4, fri:5 }
+    ];
+
+    function getThuWeeklyIncome() { return portfolio.filter(function(e){return e.group==='thu';}).reduce(function(s,e){return s+e.lastDist*e.shares;}, 0); }
+    function getFriWeeklyIncome() { return portfolio.filter(function(e){return e.group==='fri';}).reduce(function(s,e){return s+e.lastDist*e.shares;}, 0); }
+
+    function refreshAllViews() {
+      renderLogTable();
+      var dashTab = document.getElementById('tab-dashboard');
+      var payTab = document.getElementById('tab-payouts');
+      if (dashTab && !dashTab.classList.contains('hidden')) renderDashboard();
+      if (payTab && !payTab.classList.contains('hidden')) renderPayouts();
+    }
+
+    // ============================================================
+    // PRICE REFRESH — Twelve Data REST API with DB fallback
+    // ============================================================
+
+    function updateProgressRow(symbol, state, statusText) {
+      var row = document.getElementById('rp-row-' + symbol);
+      if (!row) return;
+      row.className = 'refresh-ticker-row ' + state;
+      var statusEl = row.querySelector('.refresh-ticker-status');
+      var iconEl = row.querySelector('.refresh-ticker-icon');
+      if (statusEl) statusEl.textContent = statusText;
+      if (iconEl) {
+        if (state === 'fetching') sh(iconEl, '<span class="mini-spinner"></span>');
+        else if (state === 'success') iconEl.textContent = '✅';
+        else if (state === 'stale') iconEl.textContent = '⚠️';
+        else if (state === 'failed') iconEl.textContent = '❌';
+        else if (state === 'cached') iconEl.textContent = '💾';
+        else iconEl.textContent = '⏳';
+      }
+    }
+
+    document.getElementById('btn-refresh').addEventListener('click', async function() {
+      var btn = document.getElementById('btn-refresh');
+      btn.disabled = true;
+      sh(btn, '<span class="spinner"></span> Fetching…');
+
+      var panel = document.getElementById('refresh-progress-panel');
+      panel.classList.remove('hidden');
+      var tickers = portfolio.map(function(e) { return e.ticker; });
+      var now = Date.now();
+
+      var progressHtml = '<div class="flex items-center gap-2 mb-3"><span class="text-xs text-gold-400 font-bold uppercase tracking-wide">Live Price Refresh via Twelve Data</span><span class="text-xs text-gray-500 mono">' + tickers.length + ' tickers</span></div>';
+      tickers.forEach(function(t) {
+        progressHtml += '<div class="refresh-ticker-row pending" id="rp-row-' + t + '"><span class="refresh-ticker-icon">⏳</span><span class="refresh-ticker-symbol">' + t + '</span><span class="refresh-ticker-status">Waiting…</span></div>';
+      });
+      progressHtml += '<div id="rp-summary" class="refresh-summary-bar hidden"></div>';
+      sh(panel, progressHtml);
+
+      var newPriceSourceMap = {};
+      var newStaleTickers = new Set();
+      var successCount = 0, failedCount = 0, cachedCount = 0;
+
+      // Check cache first
+      var tickersToFetch = [];
+      tickers.forEach(function(t) {
+        var cached = priceCache[t];
+        if (cached && cached.timestamp && (now - cached.timestamp < PRICE_CACHE_TTL) && cached.price > 0) {
+          updateProgressRow(t, 'cached', 'Cached (' + fmtC(cached.price) + ') — skipped (< 15 min old)');
+          var etf = portfolio.find(function(e) { return e.ticker === t; });
+          if (etf) etf.currentPrice = cached.price;
+          newPriceSourceMap[t] = 'cached';
+          cachedCount++;
+        } else {
+          tickersToFetch.push(t);
+        }
+      });
+
+      // Use Twelve Data API to get prices — batched 20 at a time
+      if (tickersToFetch.length > 0) {
+        var TD_BATCH = 20;
+        for (var bi = 0; bi < tickersToFetch.length; bi += TD_BATCH) {
+          var batch = tickersToFetch.slice(bi, bi + TD_BATCH);
+          batch.forEach(function(t) { updateProgressRow(t, 'fetching', 'Fetching…'); });
+          var tdPrices = await fetchTDPrices(batch);
+          batch.forEach(function(s) {
+            var p = tdPrices[s];
+            if (p && p > 0) {
+              var etfEntry = portfolio.find(function(e) { return e.ticker === s; });
+              if (etfEntry) etfEntry.currentPrice = p;
+              priceCache[s] = { price: p, timestamp: now, source: 'twelvedata' };
+              updateProgressRow(s, 'success', 'Live: ' + fmtC(p));
+              newPriceSourceMap[s] = 'twelvedata';
+              successCount++;
+            } else {
+              // Fallback to DB price
+              var dbFallback = ETF_DB[s] ? ETF_DB[s].price : null;
+              if (dbFallback && dbFallback > 0) {
+                var etfEntry2 = portfolio.find(function(e) { return e.ticker === s; });
+                if (etfEntry2) etfEntry2.currentPrice = dbFallback;
+                priceCache[s] = { price: dbFallback, timestamp: now, source: 'db' };
+                updateProgressRow(s, 'cached', 'DB: ' + fmtC(dbFallback));
+                newPriceSourceMap[s] = 'db';
+                cachedCount++;
+              } else {
+                updateProgressRow(s, 'failed', 'Unavailable');
+                newPriceSourceMap[s] = 'failed';
+                failedCount++;
+              }
+            }
+          });
+        }
+      }
+
+      staleTickers = newStaleTickers;
+      priceSourceMap = newPriceSourceMap;
+
+      var summaryEl = document.getElementById('rp-summary');
+      summaryEl.classList.remove('hidden');
+      var summaryHtml = '';
+      if (successCount > 0) summaryHtml += '<span class="refresh-summary-badge" style="background:rgba(0,191,165,0.15);color:#00BFA5;">✅ ' + successCount + ' live</span>';
+      if (cachedCount > 0) summaryHtml += '<span class="refresh-summary-badge" style="background:rgba(107,122,168,0.15);color:#6b7aa8;">💾 ' + cachedCount + ' cached/DB</span>';
+      if (failedCount > 0) summaryHtml += '<span class="refresh-summary-badge" style="background:rgba(255,71,87,0.15);color:#FF4757;">❌ ' + failedCount + ' failed</span>';
+      sh(summaryEl, summaryHtml);
+
+      var timeStr = new Date().toLocaleString('en-US', { hour:'numeric', minute:'2-digit', hour12:true, month:'short', day:'numeric' });
+      lastUpdated = timeStr;
+      document.getElementById('last-updated-header').textContent = 'Updated: ' + lastUpdated;
+      saveData();
+      savePriceCache();
+
+      var totalResolved = successCount + cachedCount;
+      if (totalResolved === 0) {
+        showToast('❌ Could not fetch prices. Please enter prices manually using the edit fields.', 'error', 6000);
+      } else if (failedCount > 0) {
+        showToast('✅ Prices updated at ' + timeStr + ' (' + totalResolved + '/' + tickers.length + ')', 'warning', 5000);
+      } else {
+        showToast('✅ All ' + totalResolved + ' prices updated at ' + timeStr, 'success');
+      }
+
+      setTimeout(function() { panel.classList.add('hidden'); }, 8000);
+
+      btn.disabled = false;
+      sh(btn, '<span style="font-size:1em;line-height:1;">🔄</span> Refresh Live Prices');
+      refreshAllViews();
+    });
+
+    // === TAB SWITCHING ===
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.add('hidden'); });
+        document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+        if (btn.dataset.tab === 'dashboard') renderDashboard();
+        if (btn.dataset.tab === 'payouts') renderPayouts();
+      });
+    });
+
+    // ==============================
+    // TAB 1: WEEKLY ETF LOG
+    // ==============================
+    function getSourceBadge(ticker) {
+      var src = priceSourceMap[ticker];
+      if (!src) return '';
+      if (src === 'twelvedata') return '<span class="price-source-badge psb-twelvedata">Live</span>';
+      if (src === 'ai') return '<span class="price-source-badge psb-ai">~AI</span>';
+      if (src === 'db') return '<span class="price-source-badge psb-db">~DB</span>';
+      if (src === 'cached') return '<span class="price-source-badge psb-cached">Cache</span>';
+      if (src === 'failed') return '<span class="price-source-badge psb-failed">!</span>';
+      return '';
+    }
+
+    function renderLogTable() {
+      var tbody = document.getElementById('etf-table-body');
+      var tfoot = document.getElementById('etf-table-foot');
+      var rows = '';
+      var totWeekly = 0, totAnnual = 0, sumDistYield = 0, sumYOC = 0;
+
+      portfolio.forEach(function(etf, i) {
+        var c = calc(etf);
+        totWeekly += c.weeklyIncome;
+        totAnnual += c.annualIncome;
+        sumDistYield += c.distYield;
+        sumYOC += c.yieldOnCost;
+
+        var todayStr = TODAY.toISOString().slice(0,10);
+        var daysToNext = etf.nextPayDate ? daysBetween(todayStr, etf.nextPayDate) : 999;
+        var rowClass = '';
+        if (daysToNext === 0) rowClass = 'green-row';
+        else if (daysToNext > 0 && daysToNext <= 7) rowClass = 'gold-row';
+
+        var navColor = c.navChange < 0 ? 'text-red-400' : 'text-green-400';
+        var truncName = etf.name.length > 25 ? etf.name.substring(0,24) + '…' : etf.name;
+        var isStale = staleTickers.has(etf.ticker);
+        var staleHtml = isStale ? '<span class="stale-badge" title="Price not updated — using estimated value">⚠️</span>' : '';
+        var sourceBadge = getSourceBadge(etf.ticker);
+        var yLink = '<a href="' + yahooUrl(etf.ticker) + '" target="_blank" rel="noopener" class="yahoo-link" title="View ' + etf.ticker + ' on Yahoo Finance">📊</a>';
+
+        if (editMode) {
+          rows += '<tr class="' + rowClass + '">' +
+            '<td class="font-bold text-gold-400 mono">' + etf.ticker + yLink + '</td>' +
+            '<td title="' + etf.name + '" class="text-gray-300">' + truncName + '</td>' +
+            '<td class="text-gray-400 text-xs">' + etf.strategy + '</td>' +
+            '<td class="text-gray-400 text-xs">' + etf.payGroup + '</td>' +
+            '<td><input type="number" class="edit-input" value="' + etf.shares + '" data-idx="' + i + '" data-field="shares" step="1" min="0"></td>' +
+            '<td><input type="number" class="edit-input" value="' + etf.costBasis + '" data-idx="' + i + '" data-field="costBasis" step="0.01" min="0"></td>' +
+            '<td class="mono text-teal-400">' + (etf.currentPrice > 0 ? fmtC(etf.currentPrice) : '<span class="spinner"></span>') + staleHtml + sourceBadge + '</td>' +
+            '<td class="mono text-gray-400 text-xs">' + formatDate(etf.lastExDiv) + '</td>' +
+            '<td class="mono text-gray-400 text-xs">' + formatDate(etf.lastPayDate) + '</td>' +
+            '<td class="mono ' + (daysToNext <= 7 ? 'text-gold-400 font-semibold':'text-gray-300') + ' text-xs">' + formatDate(etf.nextPayDate) + '</td>' +
+            '<td><input type="number" class="edit-input" value="' + etf.lastDist + '" data-idx="' + i + '" data-field="lastDist" step="0.0001" min="0"></td>' +
+            '<td class="mono text-gray-300">' + fmtC(c.annDist, 4) + '</td>' +
+            '<td class="mono text-teal-300">' + fmtP(c.distYield) + '</td>' +
+            '<td class="mono text-gold-300">' + fmtP(c.yieldOnCost) + '</td>' +
+            '<td class="mono text-gray-400">' + fmtP(etf.expenseRatio) + '</td>' +
+            '<td class="mono text-teal-400 font-semibold">' + fmtC(c.weeklyIncome) + '</td>' +
+            '<td class="mono text-green-400 font-semibold">' + fmtC(c.annualIncome) + '</td>' +
+            '<td class="mono ' + navColor + ' font-semibold">' + fmtP(c.navChange) + '</td>' +
+          '</tr>';
+        } else {
+          rows += '<tr class="' + rowClass + '">' +
+            '<td class="font-bold text-gold-400 mono">' + etf.ticker + yLink + '</td>' +
+            '<td title="' + etf.name + '" class="text-gray-300">' + truncName + '</td>' +
+            '<td class="text-gray-400 text-xs">' + etf.strategy + '</td>' +
+            '<td class="text-gray-400 text-xs">' + etf.payGroup + '</td>' +
+            '<td class="mono text-white">' + etf.shares + '</td>' +
+            '<td class="mono text-white">' + fmtC(etf.costBasis) + '</td>' +
+            '<td class="mono text-teal-400">' + (etf.currentPrice > 0 ? fmtC(etf.currentPrice) : '<span class="spinner"></span>') + staleHtml + sourceBadge + '</td>' +
+            '<td class="mono text-gray-400 text-xs">' + formatDate(etf.lastExDiv) + '</td>' +
+            '<td class="mono text-gray-400 text-xs">' + formatDate(etf.lastPayDate) + '</td>' +
+            '<td class="mono ' + (daysToNext <= 7 ? 'text-gold-400 font-semibold':'text-gray-300') + ' text-xs">' + formatDate(etf.nextPayDate) + '</td>' +
+            '<td class="mono text-white font-medium">' + fmtC(etf.lastDist, 4) + '</td>' +
+            '<td class="mono text-gray-300">' + fmtC(c.annDist, 4) + '</td>' +
+            '<td class="mono text-teal-300">' + fmtP(c.distYield) + '</td>' +
+            '<td class="mono text-gold-300">' + fmtP(c.yieldOnCost) + '</td>' +
+            '<td class="mono text-gray-400">' + fmtP(etf.expenseRatio) + '</td>' +
+            '<td class="mono text-teal-400 font-semibold">' + fmtC(c.weeklyIncome) + '</td>' +
+            '<td class="mono text-green-400 font-semibold">' + fmtC(c.annualIncome) + '</td>' +
+            '<td class="mono ' + navColor + ' font-semibold">' + fmtP(c.navChange) + '</td>' +
+          '</tr>';
+        }
+      });
+      sh(tbody, rows);
+
+      var avgDY = portfolio.length > 0 ? sumDistYield / portfolio.length : 0;
+      var avgYOC = portfolio.length > 0 ? sumYOC / portfolio.length : 0;
+      sh(tfoot, '<tr style="background:rgba(15,22,50,0.85);font-weight:700;">' +
+        '<td colspan="5" class="text-gold-400 text-sm">TOTALS / AVERAGES (' + portfolio.length + ' holdings)</td>' +
+        '<td colspan="10"></td>' +
+        '<td class="mono text-teal-400">' + fmtC(totWeekly) + '</td>' +
+        '<td class="mono text-green-400">' + fmtC(totAnnual) + '</td>' +
+        '<td></td>' +
+      '</tr>' +
+      '<tr style="background:rgba(15,22,50,0.85);" class="text-xs text-gray-400">' +
+        '<td colspan="12"></td>' +
+        '<td class="mono text-teal-300">Avg: ' + fmtP(avgDY) + '</td>' +
+        '<td class="mono text-gold-300">Avg: ' + fmtP(avgYOC) + '</td>' +
+        '<td colspan="4"></td>' +
+      '</tr>');
+
+      if (editMode) {
+        document.querySelectorAll('.edit-input').forEach(function(inp) {
+          inp.addEventListener('change', function(e) {
+            var idx = parseInt(e.target.dataset.idx);
+            var field = e.target.dataset.field;
+            portfolio[idx][field] = parseFloat(e.target.value) || 0;
+            renderLogTable();
+          });
+        });
+      }
+    }
+
+    document.getElementById('btn-edit').addEventListener('click', function() {
+      editMode = !editMode;
+      var btnEdit = document.getElementById('btn-edit');
+      var btnSave = document.getElementById('btn-save');
+      if (editMode) {
+        sh(btnEdit, '<span style="font-size:1em;line-height:1;">✕</span> Cancel Edit');
+        btnSave.classList.remove('hidden');
+      } else {
+        sh(btnEdit, '<span style="font-size:1em;line-height:1;">✏️</span> Edit Mode');
+        btnSave.classList.add('hidden');
+      }
+      renderLogTable();
+    });
+
+    document.getElementById('btn-save').addEventListener('click', function() {
+      saveData();
+      editMode = false;
+      sh(document.getElementById('btn-edit'), '<span style="font-size:1em;line-height:1;">✏️</span> Edit Mode');
+      document.getElementById('btn-save').classList.add('hidden');
+      renderLogTable();
+      showToast('✅ Changes saved!', 'success');
+    });
+
+    document.getElementById('btn-risk-toggle').addEventListener('click', function() {
+      document.getElementById('risk-notes').classList.toggle('open');
+    });
+
+    // ==============================
+    // MANAGE PORTFOLIO MODAL
+    // ==============================
+    var manageModal = document.getElementById('manage-portfolio-modal');
+    var mpConfirmingRemove = null;
+
+    function openManageModal() {
+      manageModal.classList.remove('hidden');
+      mpConfirmingRemove = null;
+      renderMPHoldings();
+      resetMPAddForm();
+    }
+    function closeManageModal() { manageModal.classList.add('hidden'); mpConfirmingRemove = null; }
+
+    document.getElementById('btn-manage-portfolio-header').addEventListener('click', openManageModal);
+    document.getElementById('btn-manage-portfolio-log').addEventListener('click', openManageModal);
+    document.getElementById('mp-close-btn').addEventListener('click', closeManageModal);
+    manageModal.addEventListener('click', function(e) { if (e.target === manageModal) closeManageModal(); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && !manageModal.classList.contains('hidden')) closeManageModal(); });
+
+    function renderMPHoldings() {
+      var list = document.getElementById('mp-holdings-list');
+      var empty = document.getElementById('mp-holdings-empty');
+      var badge = document.getElementById('mp-count-badge');
+      badge.textContent = portfolio.length + ' holding' + (portfolio.length !== 1 ? 's' : '');
+
+      if (portfolio.length === 0) { list.textContent = ''; empty.classList.remove('hidden'); return; }
+      empty.classList.add('hidden');
+
+      sh(list, portfolio.map(function(etf, i) {
+        var c = calc(etf);
+        var isConfirming = mpConfirmingRemove === etf.ticker;
+        var yLink = '<a href="' + yahooUrl(etf.ticker) + '" target="_blank" rel="noopener" class="yahoo-link" title="View on Yahoo Finance">📊 Yahoo</a>';
+
+        var actionHtml = isConfirming
+          ? '<div class="manage-confirm-bar"><span class="text-red-400 text-xs">Remove <strong>' + etf.ticker + '</strong>?<br><span class="text-red-400/70" style="font-size:0.65rem;">This cannot be undone.</span></span><button class="manage-confirm-yes" data-mp-confirm-yes="' + i + '">Confirm</button><button class="manage-confirm-no" data-mp-confirm-no="' + i + '">Cancel</button></div>'
+          : '<button class="manage-remove-btn" data-mp-remove="' + i + '">🗑 Remove</button>';
+
+        return '<div class="holding-card"><div class="holding-card-info"><div class="flex items-center gap-2 mb-0.5"><span class="font-bold text-gold-400 mono text-sm">' + etf.ticker + '</span>' + yLink + '<span class="text-xs text-gray-500">' + etf.payGroup + '</span></div><div class="text-xs text-gray-400 truncate" title="' + etf.name + '">' + etf.name + '</div><div class="flex gap-3 mt-1 text-xs"><span class="text-gray-500">' + etf.shares + ' shares</span><span class="text-teal-400 mono font-medium">' + fmtC(c.weeklyIncome) + '/wk</span></div></div><div class="holding-card-actions">' + actionHtml + '</div></div>';
+      }).join(''));
+
+      list.querySelectorAll('[data-mp-remove]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = parseInt(btn.dataset.mpRemove);
+          if (portfolio.length <= 1) { showToast('⚠️ Cannot remove — at least one ticker must remain in your portfolio.', 'warning'); return; }
+          mpConfirmingRemove = portfolio[idx].ticker;
+          renderMPHoldings();
+        });
+      });
+      list.querySelectorAll('[data-mp-confirm-yes]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = parseInt(btn.dataset.mpConfirmYes);
+          var ticker = portfolio[idx].ticker;
+          portfolio.splice(idx, 1); mpConfirmingRemove = null;
+          saveData(); renderMPHoldings(); refreshAllViews();
+          showToast('🗑️ ' + ticker + ' removed from portfolio', 'success');
+        });
+      });
+      list.querySelectorAll('[data-mp-confirm-no]').forEach(function(btn) {
+        btn.addEventListener('click', function() { mpConfirmingRemove = null; renderMPHoldings(); });
+      });
+    }
+
+    // ============================================================
+    // ENHANCED TICKER LOOKUP — 3-Layer Engine (DB + SmartMatch + AI)
+    // ============================================================
+    function resetMPAddForm() {
+      document.getElementById('mp-add-step1').classList.remove('hidden');
+      document.getElementById('mp-add-step2').classList.add('hidden');
+      document.getElementById('mp-ticker-input').value = '';
+      document.getElementById('mp-lookup-status').classList.add('hidden');
+      document.getElementById('mp-lookup-progress').classList.add('hidden');
+      document.getElementById('mp-lookup-progress').textContent = '';
+      document.getElementById('mp-source-banner').classList.add('hidden');
+      document.getElementById('mp-price-badge').classList.add('hidden');
+      document.getElementById('mp-price-badge').textContent = '';
+      document.getElementById('mp-field-sources').classList.add('hidden');
+      document.getElementById('mp-field-sources').textContent = '';
+      document.getElementById('mp-yahoo-link-container').classList.add('hidden');
+      document.getElementById('mp-yahoo-link-container').textContent = '';
+      document.getElementById('mp-form-error').classList.add('hidden');
+      ['mp-form-ticker','mp-form-name','mp-form-strategy','mp-form-price','mp-form-lastdist','mp-form-expratio','mp-form-shares','mp-form-costbasis','mp-form-lastpay','mp-form-nextpay','mp-form-lastexdiv'].forEach(function(id) {
+        var el = document.getElementById(id); if (el) el.value = '';
+      });
+      document.getElementById('mp-form-paygroup').selectedIndex = 0;
+    }
+
+    document.getElementById('mp-ticker-input').addEventListener('input', function(e) { e.target.value = e.target.value.toUpperCase(); });
+
+    // Main lookup handler — uses 3-layer engine
+    document.getElementById('mp-lookup-btn').addEventListener('click', async function() {
+      var input = document.getElementById('mp-ticker-input');
+      var symbol = input.value.trim().toUpperCase();
+      if (!symbol) { input.focus(); return; }
+
+      var status = document.getElementById('mp-lookup-status');
+      var progress = document.getElementById('mp-lookup-progress');
+
+      if (portfolio.some(function(e) { return e.ticker === symbol; })) {
+        status.classList.remove('hidden');
+        status.className = 'text-xs mb-2 text-red-400';
+        status.textContent = '⚠️ ' + symbol + ' is already in your portfolio.';
+        return;
+      }
+
+      var lookupBtn = document.getElementById('mp-lookup-btn');
+      lookupBtn.disabled = true;
+
+      var fieldSources = { name: null, strategy: null, price: null, lastDist: null, expenseRatio: null };
+
+      progress.classList.remove('hidden');
+      sh(progress,
+        '<div class="mp-lookup-step active" id="mp-step-db"><span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">🔍</span> <span>📚 Searching ETF Database (' + Object.keys(ETF_DB).length + ' tickers + aliases + fuzzy)...</span></div>' +
+        '<div class="mp-lookup-step" id="mp-step-ai"><span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">⏳</span> <span>🌐 Twelve Data / AI Lookup...</span></div>' +
+        '<div class="mp-lookup-step" id="mp-step-price"><span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">⏳</span> <span>💲 Fetching Price...</span></div>');
+
+      // Use the 3-layer lookupTicker (which now reads price from DB directly)
+      var result = await lookupTicker(symbol);
+      var resolvedSymbol = result.symbol || symbol;
+      var matchType = result.matchType || 'manual';
+      var hasDB = (matchType === 'exact' || matchType === 'alias' || matchType === 'prefix' || matchType === 'fuzzy' || matchType === 'name-search');
+      var hasAI = (matchType === 'ai');
+      var hasPattern = (matchType === 'pattern');
+
+      // Update progress steps
+      var dbStep = document.getElementById('mp-step-db');
+      var aiStep = document.getElementById('mp-step-ai');
+      var priceStep = document.getElementById('mp-step-price');
+
+      if (hasDB) {
+        dbStep.className = 'mp-lookup-step success';
+        var matchLabel = matchType === 'exact' ? 'Exact match' : matchType === 'alias' ? 'Alias match' : matchType === 'prefix' ? 'Prefix match' : matchType === 'fuzzy' ? 'Fuzzy match (close spelling)' : 'Name search match';
+        sh(dbStep, '<span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">✅</span> <span>📚 ' + matchLabel + ': <strong>' + resolvedSymbol + '</strong></span><span class="match-type-badge match-' + matchType + '">' + matchType + '</span>');
+        aiStep.className = 'mp-lookup-step skipped';
+        sh(aiStep, '<span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">—</span> <span>🌐 Skipped (DB match found)</span>');
+      } else if (hasAI) {
+        dbStep.className = 'mp-lookup-step skipped';
+        sh(dbStep, '<span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">—</span> <span>📚 Not in database</span>');
+        aiStep.className = 'mp-lookup-step success';
+        sh(aiStep, '<span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">✅</span> <span>🤖 Found via AI</span><span class="match-type-badge match-ai">AI</span>');
+      } else if (hasPattern) {
+        dbStep.className = 'mp-lookup-step';
+        sh(dbStep, '<span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">🔮</span> <span>📚 Pattern inference (unverified)</span><span class="match-type-badge match-pattern">pattern</span>');
+        aiStep.className = 'mp-lookup-step failed';
+        sh(aiStep, '<span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">❌</span> <span>🌐 Could not verify</span>');
+      } else {
+        dbStep.className = 'mp-lookup-step failed';
+        sh(dbStep, '<span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">❌</span> <span>📚 Not found in database</span>');
+        aiStep.className = 'mp-lookup-step failed';
+        sh(aiStep, '<span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">❌</span> <span>🌐 Lookup failed</span><span class="match-type-badge match-manual">manual</span>');
+      }
+
+      // Update price step based on whether price was fetched
+      if (result.currentPrice && result.currentPrice > 0) {
+        priceStep.className = 'mp-lookup-step success';
+        sh(priceStep, '<span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">✅</span> <span>💲 Price: <strong>$' + result.currentPrice.toFixed(2) + '</strong></span>');
+        fieldSources.price = hasDB ? 'db' : 'ai';
+      } else if (matchType !== 'manual') {
+        priceStep.className = 'mp-lookup-step failed';
+        sh(priceStep, '<span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">❌</span> <span>💲 Price unavailable — enter manually</span>');
+      } else {
+        priceStep.className = 'mp-lookup-step skipped';
+        sh(priceStep, '<span class="step-icon" style="width:16px;text-align:center;flex-shrink:0;">—</span> <span>💲 Skipped (manual entry)</span>');
+      }
+
+      // Populate form from result
+      document.getElementById('mp-form-ticker').value = resolvedSymbol;
+      if (result.name) { document.getElementById('mp-form-name').value = result.name; fieldSources.name = hasDB ? 'db' : hasAI ? 'ai' : 'manual'; }
+      if (result.strategy) { document.getElementById('mp-form-strategy').value = result.strategy; fieldSources.strategy = hasDB ? 'db' : hasAI ? 'ai' : 'manual'; }
+      if (result.currentPrice && result.currentPrice > 0) {
+        document.getElementById('mp-form-price').value = result.currentPrice.toFixed(2);
+        var addTickerPriceEl = document.getElementById('form-price');
+        if (addTickerPriceEl) {
+          addTickerPriceEl.value = result.currentPrice.toFixed(2);
+        }
+        fieldSources.price = hasDB ? 'db' : 'ai';
+      }
+      if (result.lastDist) { document.getElementById('mp-form-lastdist').value = result.lastDist; fieldSources.lastDist = hasDB ? 'db' : hasAI ? 'ai' : 'manual'; }
+      if (result.expenseRatio) { document.getElementById('mp-form-expratio').value = result.expenseRatio; fieldSources.expenseRatio = hasDB ? 'db' : hasAI ? 'ai' : 'manual'; }
+
+      // Set pay group
+      var pgSelect = document.getElementById('mp-form-paygroup');
+      var pgStr = (result.payGroup || '').toLowerCase();
+      if (pgStr.indexOf('thursday') !== -1 || pgStr.indexOf('thu') !== -1) pgSelect.selectedIndex = 0;
+      else if (pgStr.indexOf('roundhill') !== -1) pgSelect.selectedIndex = 1;
+      else if (pgStr.indexOf('friday') !== -1 || pgStr.indexOf('fri') !== -1) pgSelect.selectedIndex = 2;
+      else if (pgStr.indexOf('monthly') !== -1) pgSelect.selectedIndex = 3;
+      else pgSelect.selectedIndex = 4;
+
+      // Auto-calculate next pay date
+      var group = payGroupToGroup(pgSelect.value);
+      var nextDay = group === 'thu' ? 4 : 5;
+      var dd = new Date(TODAY);
+      while (dd.getDay() !== nextDay) dd.setDate(dd.getDate() + 1);
+      document.getElementById('mp-form-nextpay').value = dd.toISOString().slice(0,10);
+
+      // Show live price badge prominently
+      var priceBadgeEl = document.getElementById('mp-price-badge');
+      if (result.currentPrice && result.currentPrice > 0) {
+        priceBadgeEl.classList.remove('hidden');
+        sh(priceBadgeEl, '<div class="live-price-badge">💲 Current Price: <strong style="font-size:16px;margin:0 4px;">$' + result.currentPrice.toFixed(2) + '</strong> <span class="price-disclaimer">(approximate — verify before trading)</span></div>');
+      } else {
+        priceBadgeEl.classList.add('hidden');
+        priceBadgeEl.textContent = '';
+      }
+
+      // Build confidence banner
+      var sourceLabelHtml = '';
+      var confidenceClass = '';
+      var matchBadge = '<span class="match-type-badge match-' + matchType + '" style="margin-left:8px;">' + matchType + '</span>';
+
+      if (hasDB) {
+        sourceLabelHtml = '<span class="source-badge">📚 ETF Database</span>' + matchBadge;
+        confidenceClass = 'confidence-high';
+        if (result.issuer) sourceLabelHtml += '<span style="margin-left:8px;font-size:0.68rem;color:#9ca3af;">by ' + result.issuer + '</span>';
+      } else if (hasAI) {
+        sourceLabelHtml = '<span class="source-badge">🤖 AI Lookup</span>' + matchBadge;
+        confidenceClass = 'confidence-medium';
+      } else if (hasPattern) {
+        sourceLabelHtml = '<span class="source-badge">🔮 Pattern Inference</span>' + matchBadge;
+        confidenceClass = 'confidence-low';
+      } else {
+        sourceLabelHtml = '<span class="source-badge">✏️ Manual Entry</span>' + matchBadge;
+        confidenceClass = 'confidence-low';
+      }
+
+      var sourceBanner = document.getElementById('mp-source-banner');
+      sourceBanner.classList.remove('hidden');
+      sh(sourceBanner, '<div class="confidence-banner ' + confidenceClass + '">' + sourceLabelHtml + '</div>');
+
+      // Field source pills
+      var fieldSourcesEl = document.getElementById('mp-field-sources');
+      var pills = '';
+      var pillMap = { db: ['pill-db','📚 Database'], ai: ['pill-ai','🤖 AI'], manual: ['pill-manual','✏️ Manual'] };
+      var fieldKeys = Object.keys(fieldSources);
+      for (var fsi = 0; fsi < fieldKeys.length; fsi++) {
+        var fld = fieldKeys[fsi];
+        var src = fieldSources[fld];
+        if (src && pillMap[src]) {
+          pills += '<span class="field-source-pill ' + pillMap[src][0] + '">' + fld + ': ' + pillMap[src][1] + '</span>';
+        }
+      }
+      if (pills) { fieldSourcesEl.classList.remove('hidden'); sh(fieldSourcesEl, pills); }
+
+      // Yahoo link
+      var yahooLinkContainer = document.getElementById('mp-yahoo-link-container');
+      yahooLinkContainer.classList.remove('hidden');
+      sh(yahooLinkContainer, '<a href="' + yahooUrl(resolvedSymbol) + '" target="_blank" rel="noopener" class="yahoo-link-lg">📊 View ' + resolvedSymbol + ' on Yahoo Finance →</a>');
+
+      // Cache the lookup
+      lookupCache[resolvedSymbol] = {
+        data: { name: document.getElementById('mp-form-name').value, strategy: document.getElementById('mp-form-strategy').value, currentPrice: parseFloat(document.getElementById('mp-form-price').value) || 0, lastDist: parseFloat(document.getElementById('mp-form-lastdist').value) || 0, expenseRatio: parseFloat(document.getElementById('mp-form-expratio').value) || 0 },
+        price: parseFloat(document.getElementById('mp-form-price').value) || 0, ts: Date.now(), matchType: matchType
+      };
+      saveLookupCache();
+
+      lookupBtn.disabled = false;
+      document.getElementById('mp-add-step2').classList.remove('hidden');
+    });
+
+    document.getElementById('mp-ticker-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('mp-lookup-btn').click(); } });
+    document.getElementById('mp-add-reset-btn').addEventListener('click', function() { resetMPAddForm(); });
+
+    document.getElementById('mp-add-confirm-btn').addEventListener('click', function() {
+      var ticker = document.getElementById('mp-form-ticker').value.trim().toUpperCase();
+      var name = document.getElementById('mp-form-name').value.trim();
+      var formError = document.getElementById('mp-form-error');
+      if (!ticker || !name) { formError.classList.remove('hidden'); formError.textContent = 'Ticker and Name are required.'; return; }
+      if (portfolio.some(function(e) { return e.ticker === ticker; })) { formError.classList.remove('hidden'); formError.textContent = ticker + ' is already in your portfolio.'; return; }
+      formError.classList.add('hidden');
+
+      var payGroup = document.getElementById('mp-form-paygroup').value;
+      var group = payGroupToGroup(payGroup);
+      var newEtf = {
+        ticker: ticker, name: name,
+        strategy: document.getElementById('mp-form-strategy').value.trim() || 'Unknown',
+        payGroup: payGroup,
+        shares: parseFloat(document.getElementById('mp-form-shares').value) || 0,
+        costBasis: parseFloat(document.getElementById('mp-form-costbasis').value) || 0,
+        currentPrice: parseFloat(document.getElementById('mp-form-price').value) || 0,
+        lastDist: parseFloat(document.getElementById('mp-form-lastdist').value) || 0,
+        expenseRatio: parseFloat(document.getElementById('mp-form-expratio').value) || 0,
+        lastExDiv: document.getElementById('mp-form-lastexdiv').value || '',
+        lastPayDate: document.getElementById('mp-form-lastpay').value || '',
+        nextPayDate: document.getElementById('mp-form-nextpay').value || '',
+        group: group
+      };
+      portfolio.push(newEtf);
+      saveData(); renderMPHoldings(); resetMPAddForm(); refreshAllViews();
+      showToast('✅ ' + ticker + ' added to your portfolio!', 'success');
+    });
+
+    // ==============================
+    // LEGACY ADD TICKER MODAL — Look Up button handler
+    // ==============================
+    var modal = document.getElementById('add-ticker-modal');
+    document.getElementById('modal-close-x').addEventListener('click', function() { modal.classList.add('hidden'); });
+    document.getElementById('btn-add-cancel').addEventListener('click', function() { modal.classList.add('hidden'); });
+    modal.addEventListener('click', function(e) { if (e.target === modal) modal.classList.add('hidden'); });
+
+    document.getElementById('btn-lookup').addEventListener('click', async function() {
+      var input = document.getElementById('lookup-ticker');
+      var symbol = input.value.trim().toUpperCase();
+      if (!symbol) { input.focus(); return; }
+
+      var lookupStatusEl = document.getElementById('lookup-status');
+      var lookupProgressEl = document.getElementById('lookup-progress-container');
+
+      if (portfolio.some(function(e) { return e.ticker === symbol; })) {
+        lookupStatusEl.classList.remove('hidden');
+        lookupStatusEl.className = 'text-xs mb-3 text-red-400';
+        lookupStatusEl.textContent = '⚠️ ' + symbol + ' is already in your portfolio.';
+        return;
+      }
+
+      var lookupBtn = document.getElementById('btn-lookup');
+      lookupBtn.disabled = true;
+      sh(lookupBtn, '<span class="mini-spinner"></span> Looking up…');
+
+      lookupStatusEl.classList.remove('hidden');
+      lookupStatusEl.className = 'text-xs mb-3 text-gold-400 animate-pulse-slow';
+      sh(lookupStatusEl, '<span class="mini-spinner" style="margin-right:6px;"></span> Searching…');
+
+      var result = await lookupTicker(symbol);
+      var resolvedSymbol = result.symbol || symbol;
+
+      // Fill legacy modal form fields
+      document.getElementById('form-ticker').value = resolvedSymbol;
+      if (result.name) document.getElementById('form-name').value = result.name;
+      if (result.strategy) document.getElementById('form-strategy').value = result.strategy;
+      if (result.currentPrice && result.currentPrice > 0) {
+        document.getElementById('form-price').value = result.currentPrice.toFixed(2);
+      }
+      if (result.lastDist) document.getElementById('form-lastdist').value = result.lastDist;
+      if (result.expenseRatio) document.getElementById('form-expratio').value = result.expenseRatio;
+
+      // Set pay group
+      var pgSelect = document.getElementById('form-paygroup');
+      var pgStr = (result.payGroup || '').toLowerCase();
+      if (pgStr.indexOf('thursday') !== -1 || pgStr.indexOf('thu') !== -1) pgSelect.selectedIndex = 0;
+      else if (pgStr.indexOf('roundhill') !== -1) pgSelect.selectedIndex = 1;
+      else if (pgStr.indexOf('friday') !== -1 || pgStr.indexOf('fri') !== -1) pgSelect.selectedIndex = 2;
+      else if (pgStr.indexOf('monthly') !== -1) pgSelect.selectedIndex = 3;
+      else pgSelect.selectedIndex = 4;
+
+      // Auto-calculate next pay date
+      var group = payGroupToGroup(pgSelect.value);
+      var nextDay = group === 'thu' ? 4 : 5;
+      var dd = new Date(TODAY);
+      while (dd.getDay() !== nextDay) dd.setDate(dd.getDate() + 1);
+      document.getElementById('form-nextpay').value = dd.toISOString().slice(0,10);
+
+      lookupStatusEl.className = 'text-xs mb-3 text-teal-400';
+      lookupStatusEl.textContent = '✅ Found: ' + resolvedSymbol + (result.name ? ' — ' + result.name : '') + (result.currentPrice > 0 ? ' • $' + result.currentPrice.toFixed(2) : '');
+
+      lookupBtn.disabled = false;
+      sh(lookupBtn, '<span style="font-size:1em;line-height:1;">🔍</span> Look Up');
+      document.getElementById('modal-step1').classList.add('hidden');
+      document.getElementById('modal-step2').classList.remove('hidden');
+    });
+
+    document.getElementById('lookup-ticker').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('btn-lookup').click(); } });
+
+    // Legacy modal Add to Portfolio confirm button
+    document.getElementById('btn-add-confirm').addEventListener('click', function() {
+      var ticker = document.getElementById('form-ticker').value.trim().toUpperCase();
+      var name = document.getElementById('form-name').value.trim();
+      var formError = document.getElementById('form-error');
+      if (!ticker || !name) { formError.classList.remove('hidden'); formError.textContent = 'Ticker and Name are required.'; return; }
+      if (portfolio.some(function(e) { return e.ticker === ticker; })) { formError.classList.remove('hidden'); formError.textContent = ticker + ' is already in your portfolio.'; return; }
+      formError.classList.add('hidden');
+
+      var payGroup = document.getElementById('form-paygroup').value;
+      var group = payGroupToGroup(payGroup);
+      var newEtf = {
+        ticker: ticker, name: name,
+        strategy: document.getElementById('form-strategy').value.trim() || 'Unknown',
+        payGroup: payGroup,
+        shares: parseFloat(document.getElementById('form-shares').value) || 0,
+        costBasis: parseFloat(document.getElementById('form-costbasis').value) || 0,
+        currentPrice: parseFloat(document.getElementById('form-price').value) || 0,
+        lastDist: parseFloat(document.getElementById('form-lastdist').value) || 0,
+        expenseRatio: parseFloat(document.getElementById('form-expratio').value) || 0,
+        lastExDiv: document.getElementById('form-lastexdiv').value || '',
+        lastPayDate: document.getElementById('form-lastpay').value || '',
+        nextPayDate: document.getElementById('form-nextpay').value || '',
+        group: group
+      };
+      portfolio.push(newEtf);
+      modal.classList.add('hidden');
+      // Reset legacy modal
+      document.getElementById('modal-step1').classList.remove('hidden');
+      document.getElementById('modal-step2').classList.add('hidden');
+      document.getElementById('lookup-ticker').value = '';
+      document.getElementById('lookup-status').classList.add('hidden');
+      saveData(); refreshAllViews();
+      showToast('✅ ' + ticker + ' added to your portfolio!', 'success');
+    });
+
+    // ==============================
+    // TAB 2: DASHBOARD
+    // ==============================
+    function renderDashboard() {
+      var todayStr = TODAY.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+      document.getElementById('dash-date-subtitle').textContent = todayStr;
+
+      var totWeekly = portfolio.reduce(function(s,e) { return s + calc(e).weeklyIncome; }, 0);
+      var totAnnual = portfolio.reduce(function(s,e) { return s + calc(e).annualIncome; }, 0);
+      var totMonthly = totWeekly * 4.33;
+      var avgDY = portfolio.length > 0 ? portfolio.reduce(function(s,e) { return s + calc(e).distYield; }, 0) / portfolio.length : 0;
+      var avgYOC = portfolio.length > 0 ? portfolio.reduce(function(s,e) { return s + calc(e).yieldOnCost; }, 0) / portfolio.length : 0;
+      var thuTickers = portfolio.filter(function(e){return e.group==='thu';}).map(function(e){return e.ticker;}).join(', ');
+      var friTickers = portfolio.filter(function(e){return e.group==='fri';}).map(function(e){return e.ticker;}).join(', ');
+
+      sh(document.getElementById('summary-cards'),
+        '<div class="summary-card"><p class="text-2xl font-bold text-teal-400 mono">' + fmtC(totWeekly) + '</p><p class="text-xs text-gray-400 mt-1 uppercase tracking-wide">Weekly Income</p></div>' +
+        '<div class="summary-card"><p class="text-2xl font-bold text-gold-400 mono">' + fmtC(totMonthly) + '</p><p class="text-xs text-gray-400 mt-1 uppercase tracking-wide">Est. Monthly</p></div>' +
+        '<div class="summary-card"><p class="text-2xl font-bold text-green-400 mono">' + fmtC(totAnnual) + '</p><p class="text-xs text-gray-400 mt-1 uppercase tracking-wide">Est. Annual</p></div>' +
+        '<div class="summary-card"><p class="text-2xl font-bold text-teal-300 mono">' + fmtP(avgDY) + '</p><p class="text-xs text-gray-400 mt-1 uppercase tracking-wide">Avg Dist Yield</p></div>' +
+        '<div class="summary-card"><p class="text-2xl font-bold text-gold-300 mono">' + fmtP(avgYOC) + '</p><p class="text-xs text-gray-400 mt-1 uppercase tracking-wide">Avg Yield on Cost</p></div>' +
+        '<div class="summary-card"><p class="text-2xl font-bold text-white mono">' + portfolio.length + '</p><p class="text-xs text-gray-400 mt-1 uppercase tracking-wide">Holdings</p>' + (thuTickers ? '<p class="text-xs text-gray-500 mt-1">Thu: '+thuTickers+'</p>' : '') + (friTickers ? '<p class="text-xs text-gray-500">Fri: '+friTickers+'</p>' : '') + '</div>');
+
+      var thuWk = getThuWeeklyIncome();
+      var friWk = getFriWeeklyIncome();
+      var monthlyData = monthlyPayWeeks.map(function(m) { return { month:m.month, thu:m.thu, fri:m.fri, income: thuWk * m.thu + friWk * m.fri }; });
+      var totalAnn = monthlyData.reduce(function(s,m) { return s + m.income; }, 0);
+      var currentMonthIdx = 5;
+
+      var ctxM = document.getElementById('monthly-chart').getContext('2d');
+      if (monthlyChart) monthlyChart.destroy();
+      monthlyChart = new Chart(ctxM, {
+        type: 'bar',
+        data: {
+          labels: monthlyData.map(function(m) { return m.month; }),
+          datasets: [{ label: 'Est. Monthly Income ($)', data: monthlyData.map(function(m) { return m.income; }), backgroundColor: monthlyData.map(function(m,i) { return i === currentMonthIdx ? '#F5C842' : 'rgba(0,191,165,0.7)'; }), borderColor: '#F5C842', borderWidth: 1 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return fmtC(ctx.raw); } } } }, scales: { x: { ticks: { color:'#9ca3af', font:{size:11} }, grid: { display:false } }, y: { ticks: { color:'#9ca3af', callback: function(v) { return '$'+v.toLocaleString(); }, font:{size:10} }, grid: { color:'rgba(46,58,90,0.3)' } } } }
+      });
+
+      sh(document.getElementById('monthly-table-body'), monthlyData.map(function(m,i) {
+        return '<tr class="' + (i===currentMonthIdx?'highlight-month':'') + '"><td class="mono font-medium ' + (i===currentMonthIdx?'text-gold-400':'text-white') + '">' + m.month + '</td><td class="mono text-gray-300">' + m.thu + '</td><td class="mono text-gray-300">' + m.fri + '</td><td class="mono text-teal-400 font-semibold">' + fmtC(m.income) + '</td><td class="mono text-gray-400">' + (totalAnn > 0 ? fmtP(m.income/totalAnn*100) : '0.00%') + '</td></tr>';
+      }).join(''));
+
+      var strategies = {};
+      portfolio.forEach(function(e) {
+        if (!strategies[e.strategy]) strategies[e.strategy] = { tickers:[], count:0, weekly:0, annual:0 };
+        var c = calc(e);
+        strategies[e.strategy].tickers.push(e.ticker);
+        strategies[e.strategy].count++;
+        strategies[e.strategy].weekly += c.weeklyIncome;
+        strategies[e.strategy].annual += c.annualIncome;
+      });
+
+      var stratKeys = Object.keys(strategies);
+      var stratColors = ['#F5C842','#00BFA5','#5489d6','#9c6ac9','#e7615b','#ff8c42','#4dd6b5','#fbe49a','#80e2cb','#6b7aa8'];
+
+      var ctxS = document.getElementById('strategy-chart').getContext('2d');
+      if (strategyChart) strategyChart.destroy();
+      strategyChart = new Chart(ctxS, {
+        type: 'doughnut',
+        data: { labels: stratKeys, datasets: [{ data: stratKeys.map(function(k) { return strategies[k].weekly; }), backgroundColor: stratColors.slice(0, stratKeys.length), borderColor: 'rgba(10,20,50,0.9)', borderWidth: 2 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position:'bottom', labels:{ color:'#d1d5db', font:{size:10}, padding:12 } }, tooltip: { callbacks: { label: function(ctx) { return ctx.label + ': ' + fmtC(ctx.raw) + '/wk'; } } } } }
+      });
+
+      sh(document.getElementById('strategy-table-body'), stratKeys.map(function(k,i) {
+        return '<tr><td class="text-xs" style="color:' + stratColors[i % stratColors.length] + '">' + k + '</td><td class="mono text-gray-300 text-xs">' + strategies[k].tickers.join(', ') + '</td><td class="mono text-white">' + strategies[k].count + '</td><td class="mono text-teal-400 font-semibold">' + fmtC(strategies[k].weekly) + '</td><td class="mono text-green-400">' + fmtC(strategies[k].annual) + '</td></tr>';
+      }).join(''));
+
+      sh(document.getElementById('risk-table-body'), portfolio.map(function(etf) {
+        var c = calc(etf);
+        var riskClass, riskLabel;
+        if (c.navChange >= 0) { riskClass='risk-low'; riskLabel='Low'; }
+        else if (c.navChange > -10) { riskClass='risk-moderate'; riskLabel='Moderate'; }
+        else if (c.navChange > -25) { riskClass='risk-high'; riskLabel='High'; }
+        else { riskClass='risk-extreme'; riskLabel='Extreme'; }
+        var navColor = c.navChange < 0 ? 'text-red-400' : 'text-green-400';
+        return '<tr><td class="font-bold text-gold-400 mono">' + etf.ticker + '</td><td class="mono text-teal-300">' + fmtP(c.distYield) + '</td><td class="mono text-gray-300">' + fmtC(etf.costBasis) + '</td><td class="mono text-teal-400">' + fmtC(etf.currentPrice) + '</td><td class="mono ' + navColor + ' font-semibold">' + fmtP(c.navChange) + '</td><td><span class="badge ' + riskClass + '">' + riskLabel + '</span></td></tr>';
+      }).join(''));
+
+      var totalCost = portfolio.reduce(function(s,e) { return s + e.shares * e.costBasis; }, 0);
+      var totalCurrent = portfolio.reduce(function(s,e) { return s + e.shares * e.currentPrice; }, 0);
+      var totalNavChg = totalCurrent - totalCost;
+      var totalNavPct = totalCost > 0 ? (totalNavChg / totalCost) * 100 : 0;
+      var navChgColor = totalNavChg < 0 ? 'text-red-400' : 'text-green-400';
+
+      sh(document.getElementById('portfolio-value-cards'),
+        '<div class="summary-card"><p class="text-xl font-bold text-white mono">' + fmtC(totalCost) + '</p><p class="text-xs text-gray-400 mt-1 uppercase tracking-wide">Total Cost Basis</p></div>' +
+        '<div class="summary-card"><p class="text-xl font-bold text-teal-400 mono">' + fmtC(totalCurrent) + '</p><p class="text-xs text-gray-400 mt-1 uppercase tracking-wide">Current Value</p></div>' +
+        '<div class="summary-card"><p class="text-xl font-bold ' + navChgColor + ' mono">' + fmtC(totalNavChg) + '</p><p class="text-xs text-gray-400 mt-1 uppercase tracking-wide">NAV Change ($)</p></div>' +
+        '<div class="summary-card"><p class="text-xl font-bold ' + navChgColor + ' mono">' + fmtP(totalNavPct) + '</p><p class="text-xs text-gray-400 mt-1 uppercase tracking-wide">NAV Change (%)</p></div>' +
+        '<div class="summary-card"><p class="text-xl font-bold text-green-400 mono">' + fmtC(totAnnual) + '</p><p class="text-xs text-gray-400 mt-1 uppercase tracking-wide">Est. Annual Income</p></div>');
+    }
+
+    // ==============================
+    // TAB 3: UPCOMING PAYOUTS
+    // ==============================
+    function renderPayouts() {
+      var todayStr = TODAY.toISOString().slice(0,10);
+
+      function getNextDays(dayOfWeek, startDate, count) {
+        var dates = [];
+        var d = new Date(startDate);
+        while (d.getDay() !== dayOfWeek) d.setDate(d.getDate() + 1);
+        var todayCheck = new Date(startDate); todayCheck.setHours(0,0,0,0); d.setHours(0,0,0,0);
+        if (d < todayCheck) d.setDate(d.getDate() + 7);
+        for (var i = 0; i < count; i++) { dates.push(new Date(d)); d.setDate(d.getDate() + 7); }
+        return dates;
+      }
+
+      var thuDates = getNextDays(4, TODAY, 5);
+      var friDates = getNextDays(5, TODAY, 5);
+      var thuETFs = portfolio.filter(function(e) { return e.group === 'thu'; });
+      var friETFs = portfolio.filter(function(e) { return e.group === 'fri'; });
+
+      var allPayouts = [];
+      thuDates.forEach(function(d) { thuETFs.forEach(function(etf) { allPayouts.push({ date: d, day: 'Thursday', ticker: etf.ticker, name: etf.name, payGroup: etf.payGroup, shares: etf.shares, lastDist: etf.lastDist, payout: etf.shares * etf.lastDist }); }); });
+      friDates.forEach(function(d) { friETFs.forEach(function(etf) { allPayouts.push({ date: d, day: 'Friday', ticker: etf.ticker, name: etf.name, payGroup: etf.payGroup, shares: etf.shares, lastDist: etf.lastDist, payout: etf.shares * etf.lastDist }); }); });
+      allPayouts.sort(function(a,b) { return a.date - b.date; });
+
+      var allDates = thuDates.concat(friDates);
+      var endDate = allDates.length > 0 ? new Date(Math.max.apply(null, allDates.map(function(d){return d.getTime();}))) : TODAY;
+      document.getElementById('payouts-date-subtitle').textContent = formatDate(todayStr) + ' — ' + endDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+      var tableRows = '';
+      allPayouts.forEach(function(p) {
+        var pDateStr = p.date.toISOString().slice(0,10);
+        var daysAway = daysBetween(todayStr, pDateStr);
+        var rowClass = '';
+        if (daysAway === 0) rowClass = 'green-row';
+        else if (daysAway > 0 && daysAway <= 2) rowClass = 'gold-row';
+        var shortName = p.name.length > 30 ? p.name.substring(0,29)+'…' : p.name;
+        tableRows += '<tr class="' + rowClass + '"><td class="mono text-white font-medium">' + formatDate(pDateStr) + '</td><td class="text-gray-300">' + p.day + '</td><td class="font-bold text-gold-400 mono">' + p.ticker + '</td><td class="text-gray-300 text-xs">' + shortName + '</td><td class="text-gray-400 text-xs">' + p.payGroup + '</td><td class="mono text-white">' + p.shares + '</td><td class="mono text-white">' + fmtC(p.lastDist, 4) + '</td><td class="mono text-teal-400 font-semibold">' + fmtC(p.payout) + '</td></tr>';
+      });
+      sh(document.getElementById('payouts-table-body'), tableRows);
+
+      var weeks = [];
+      for (var i = 0; i < 5; i++) {
+        var thuPay = thuETFs.reduce(function(s,e) { return s + e.shares * e.lastDist; }, 0);
+        var friPay = friETFs.reduce(function(s,e) { return s + e.shares * e.lastDist; }, 0);
+        weeks.push({ label: 'Week ' + (i+1) + ' (' + thuDates[i].toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' – ' + friDates[i].toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ')', thu: thuPay, fri: friPay, total: thuPay + friPay });
+      }
+
+      sh(document.getElementById('weekly-summary-body'), weeks.map(function(w,i) {
+        return '<tr class="' + (i===0?'gold-row':'') + '"><td class="text-white text-xs font-medium">' + w.label + '</td><td class="mono text-teal-400">' + fmtC(w.thu) + '</td><td class="mono text-teal-400">' + fmtC(w.fri) + '</td><td class="mono text-gold-400 font-bold">' + fmtC(w.total) + '</td></tr>';
+      }).join(''));
+
+      var thisWeekTotal = weeks[0] ? weeks[0].total : 0;
+      var nextWeekTotal = weeks[1] ? weeks[1].total : 0;
+      var fiveWeekTotal = weeks.reduce(function(s,w) { return s + w.total; }, 0);
+
+      sh(document.getElementById('payout-summary-cards'),
+        '<div class="summary-card border-l-4" style="border-left-color:#00BFA5;"><p class="text-xs text-gray-400 uppercase tracking-wide mb-1">This Week</p><p class="text-2xl font-bold text-teal-400 mono">' + fmtC(thisWeekTotal) + '</p></div>' +
+        '<div class="summary-card border-l-4" style="border-left-color:#F5C842;"><p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Next Week</p><p class="text-2xl font-bold text-gold-400 mono">' + fmtC(nextWeekTotal) + '</p></div>' +
+        '<div class="summary-card border-l-4" style="border-left-color:#2ecc71;"><p class="text-xs text-gray-400 uppercase tracking-wide mb-1">5-Week Total</p><p class="text-2xl font-bold text-green-400 mono">' + fmtC(fiveWeekTotal) + '</p></div>');
+
+      function daysUntilNext(dayOfWeek) {
+        var d = new Date(TODAY);
+        while (d.getDay() !== dayOfWeek) d.setDate(d.getDate() + 1);
+        var diff = daysBetween(todayStr, d.toISOString().slice(0,10));
+        return { days: diff, date: d };
+      }
+      var nextThu = daysUntilNext(4);
+      var nextFri = daysUntilNext(5);
+      var thuTickerList = thuETFs.map(function(e){return e.ticker;}).join(', ') || 'None';
+      var friTickerList = friETFs.map(function(e){return e.ticker;}).join(', ') || 'None';
+
+      sh(document.getElementById('countdown-cards'),
+        '<div class="card p-5 flex items-center gap-4"><div class="w-14 h-14 rounded-full bg-gold-400/10 flex items-center justify-center"><span class="text-2xl font-bold text-gold-400 mono">' + nextThu.days + '</span></div><div><p class="text-sm font-semibold text-white">Group 1 — Thursday Payout</p><p class="text-xs text-gray-400">' + (nextThu.days === 0 ? '🟢 TODAY!' : 'In ' + nextThu.days + ' day' + (nextThu.days!==1?'s':'')) + ' · ' + formatDate(nextThu.date.toISOString().slice(0,10)) + '</p><p class="text-xs text-gray-500 mt-0.5">' + thuTickerList + '</p></div></div>' +
+        '<div class="card p-5 flex items-center gap-4"><div class="w-14 h-14 rounded-full bg-teal-400/10 flex items-center justify-center"><span class="text-2xl font-bold text-teal-400 mono">' + nextFri.days + '</span></div><div><p class="text-sm font-semibold text-white">Group 2 — Friday Payout</p><p class="text-xs text-gray-400">' + (nextFri.days === 0 ? '🟢 TODAY!' : 'In ' + nextFri.days + ' day' + (nextFri.days!==1?'s':'')) + ' · ' + formatDate(nextFri.date.toISOString().slice(0,10)) + '</p><p class="text-xs text-gray-500 mt-0.5">' + friTickerList + '</p></div></div>');
+    }
+
+    // ── AUTO PRICE REFRESH ────────────────────────────────────────────
+    var autoRefreshTimer = null;
+    var autoRefreshCountdownTimer = null;
+    var autoRefreshNextAt = null;
+    var AUTO_REFRESH_MS = 15 * 60 * 1000; // 15 minutes
+
+    function formatCountdown(ms) {
+      if (ms <= 0) return '0:00';
+      var totalSec = Math.ceil(ms / 1000);
+      var min = Math.floor(totalSec / 60);
+      var sec = totalSec % 60;
+      return min + ':' + (sec < 10 ? '0' : '') + sec;
+    }
+
+    function updateAutoRefreshHeader() {
+      var el = document.getElementById('auto-refresh-status');
+      if (!el) return;
+      if (!autoRefreshNextAt) { el.textContent = ''; return; }
+      var remaining = autoRefreshNextAt - Date.now();
+      el.textContent = remaining > 0 ? '⏱ Next refresh in ' + formatCountdown(remaining) : '🔄 Refreshing…';
+    }
+
+    function stopAutoRefresh() {
+      if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+      if (autoRefreshCountdownTimer) { clearInterval(autoRefreshCountdownTimer); autoRefreshCountdownTimer = null; }
+      autoRefreshNextAt = null;
+      var el = document.getElementById('auto-refresh-status');
+      if (el) el.textContent = '';
+      var btn = document.getElementById('btn-auto-refresh-toggle');
+      if (btn) { btn.textContent = '▶ Auto'; btn.title = 'Enable auto price refresh every 15 min'; btn.classList.remove('active-auto'); }
+    }
+
+    function startAutoRefresh() {
+      stopAutoRefresh();
+      autoRefreshNextAt = Date.now() + AUTO_REFRESH_MS;
+      // Countdown tick every second
+      autoRefreshCountdownTimer = setInterval(function() {
+        updateAutoRefreshHeader();
+      }, 1000);
+      // Actual refresh tick every 15 min
+      autoRefreshTimer = setInterval(function() {
+        autoRefreshNextAt = Date.now() + AUTO_REFRESH_MS;
+        document.getElementById('btn-refresh').click();
+      }, AUTO_REFRESH_MS);
+      updateAutoRefreshHeader();
+      var btn = document.getElementById('btn-auto-refresh-toggle');
+      if (btn) { btn.textContent = '⏸ Auto'; btn.title = 'Disable auto price refresh'; btn.classList.add('active-auto'); }
+    }
+    // ── END AUTO PRICE REFRESH ───────────────────────────────────────
+
+    // ── UPDATE ALL DB PRICES — Twelve Data ──────────────────────────
+    async function updateAllDBPrices() {
+      var btn = document.getElementById('btn-update-db');
+      var toast = document.getElementById('db-update-toast');
+
+      function showToastMsg(msg) { if (toast) { toast.style.display = 'block'; toast.textContent = msg; } }
+
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Updating…'; }
+      showToastMsg('🗄️ Connecting to Twelve Data…');
+
+      var allTickers = Object.keys(ETF_DB);
+      var TD_BATCH = 20;
+      var updated = 0;
+      var failed = 0;
+      var total = allTickers.length;
+
+      for (var i = 0; i < allTickers.length; i += TD_BATCH) {
+        var batch = allTickers.slice(i, i + TD_BATCH);
+        var batchNum = Math.floor(i / TD_BATCH) + 1;
+        var totalBatches = Math.ceil(total / TD_BATCH);
+        showToastMsg('🗄️ Batch ' + batchNum + '/' + totalBatches + ' — ' + updated + ' updated…');
+        var tdPrices = await fetchTDPrices(batch);
+        batch.forEach(function(sym) {
+          var p = tdPrices[sym];
+          if (p && p > 0) {
+            ETF_DB[sym].price = p;
+            if (priceCache && priceCache[sym]) delete priceCache[sym];
+            updated++;
+          } else {
+            failed++;
+          }
+        });
+        // Respect Twelve Data rate limit (8 req/min on free tier) — wait 1s between batches
+        if (i + TD_BATCH < allTickers.length) await new Promise(function(r) { setTimeout(r, 1000); });
+      }
+
+      try { refreshAllViews(); } catch(e) {}
+
+      if (btn) { btn.disabled = false; btn.textContent = '🗄️ Update DB'; }
+      var finalMsg = updated > 0
+        ? '✅ DB updated — ' + updated + '/' + total + ' live prices from Twelve Data' + (failed > 0 ? ' (' + failed + ' not listed)' : '')
+        : '⚠️ DB update failed — check API key or network';
+      showToastMsg(finalMsg);
+      setTimeout(function() { if (toast) toast.style.display = 'none'; }, 8000);
+    }
+    // ── END UPDATE ALL DB PRICES ──────────────────────────────────────
+
+    // ==============================
+    // INITIALIZATION
+    // ==============================
+    async function init() {
+      await loadData();
+      if (lastUpdated) { document.getElementById('last-updated-header').textContent = 'Updated: ' + lastUpdated; }
+      renderLogTable();
+      // Wire auto-refresh toggle
+      var toggleBtn = document.getElementById('btn-auto-refresh-toggle');
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', function() {
+          if (autoRefreshTimer) {
+            stopAutoRefresh();
+          } else {
+            startAutoRefresh();
+          }
+        });
+      }
+      // Wire Update DB button
+      var updateDbBtn = document.getElementById('btn-update-db');
+      if (updateDbBtn) {
+        updateDbBtn.addEventListener('click', updateAllDBPrices);
+      }
+      // Start auto-refresh on load
+      startAutoRefresh();
+    }
+    init();
+  </script>
+</body>
+</html>
